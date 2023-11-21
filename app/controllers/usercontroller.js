@@ -288,7 +288,7 @@ const transporter = nodemailer.createTransport({
         user: 'mahreentassawar@gmail.com',
         pass: 'apilqktqmvdfdryc',
     },
-}); 
+});
 
 const updatepassword = async (req, res) => {
     const { email, password } = req.body;
@@ -442,4 +442,216 @@ const deleteuserpermanently = async (req, res) => {
     }
 };
 
-module.exports = { usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, updatepassword, deleteuser, getalldeletedusers, deleteuserpermanently };
+const updateUserBlockStatus = async (req, res) => {
+    const { id } = req.params;
+    const { block_status } = req.body;
+
+    try {
+        // Check if the user exists
+        const userExistsQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistsResult = await pool.query(userExistsQuery, [id]);
+
+        if (userExistsResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'User not found' });
+        }
+
+        // Update block_status for the user
+        const updateBlockStatusQuery = 'UPDATE Users SET block_status = $1 WHERE id = $2';
+        await pool.query(updateBlockStatusQuery, [block_status, id]);
+
+        // Get updated user details
+        const updatedUserQuery = 'SELECT * FROM Users WHERE id = $1';
+        const updatedUserResult = await pool.query(updatedUserQuery, [id]);
+        const userDetails = updatedUserResult.rows[0];
+
+        return res.status(200).json({
+            message: 'Block status updated successfully',
+            error: false,
+            userDetails,
+        });
+    } catch (error) {
+        console.error('Error updating block status:', error);
+        return res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
+const getUsersWithFilters = async (req, res) => {
+    const { gender, country, height, looking_for } = req.body;
+
+    try {
+        // Base query to fetch users with provided filters
+        let filterQuery = 'SELECT * FROM Users WHERE';
+
+        const filters = [];
+        const values = [];
+
+        // Constructing query based on provided filters
+        if (gender) {
+            filters.push('gender = $1');
+            values.push(gender);
+        }
+        if (country) {
+            filters.push('country = $' + (values.length + 1));
+            values.push(country);
+        }
+        if (height) {
+            filters.push('height = $' + (values.length + 1));
+            values.push(height);
+        }
+        if (looking_for) {
+            filters.push('looking_for = $' + (values.length + 1));
+            values.push(looking_for);
+        }
+
+        // Combining all filters into the query
+        if (filters.length > 0) {
+            filterQuery += ' ' + filters.join(' AND ');
+        } else {
+            filterQuery += ' 1 = 1'; // To avoid syntax errors, a default condition if no filters are provided
+        }
+
+        const filteredUsers = await pool.query(filterQuery, values);
+
+        return res.status(200).json({
+            message: 'Filtered users fetched successfully',
+            error: false,
+            count: filteredUsers.rowCount,
+            data: filteredUsers.rows,
+        });
+    } catch (error) {
+        console.error('Error fetching filtered users:', error);
+        return res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
+const updateUserVerifiedStatus = async (req, res) => {
+    const { id } = req.params;
+    const { verified_status } = req.body;
+
+    try {
+        // Check if the user exists
+        const userExists = await pool.query('SELECT EXISTS(SELECT 1 FROM Users WHERE id = $1)', [id]);
+        if (!userExists.rows[0].exists) {
+            return res.status(404).json({ error: true, msg: 'User not found' });
+        }
+
+        // Update the verified_status for the user
+        await pool.query('UPDATE Users SET verified_status = $1 WHERE id = $2 RETURNING *', [verified_status, id]);
+
+        // Fetch updated user details
+        const updatedUser = await pool.query('SELECT * FROM Users WHERE id = $1', [id]);
+
+        res.status(200).json({ error: false, msg: 'Verified status updated successfully', user: updatedUser.rows[0] });
+    } catch (error) {
+        console.error('Error updating verified status:', error);
+        res.status(500).json({ error: true, msg: 'Internal Server Error' });
+    }
+};
+
+const getVerifiedUsers = async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
+
+    try {
+        // Calculate the OFFSET based on the page and limit
+        const offset = (page - 1) * limit;
+
+        // Query to retrieve verified users with pagination
+        const verifiedUsersQuery = `
+        SELECT *, COUNT(*) OVER() AS total_count
+        FROM Users
+        WHERE verified_status = true
+        ORDER BY id
+        OFFSET $1
+        LIMIT $2
+      `;
+
+        const verifiedUsersResult = await pool.query(verifiedUsersQuery, [offset, limit]);
+        const verifiedUsers = verifiedUsersResult.rows;
+
+        // Extract the total count from the first row of the result
+        const totalCount = verifiedUsers.length > 0 ? verifiedUsers[0].total_count : 0;
+
+        res.status(200).json({
+            error: false,
+            msg: 'Verified users fetched successfully',
+            count: verifiedUsers.length,
+            total_count: totalCount,
+            data: verifiedUsers,
+        });
+    } catch (error) {
+        console.error('Error fetching verified users:', error);
+        res.status(500).json({ error: true, msg: 'Internal Server Error' });
+    }
+};
+
+const getVerifiedUserById = async (req, res) => {
+    const { id } = req.params;
+
+    try {
+        // Check if the user exists and is verified
+        const verifiedUser = await pool.query('SELECT * FROM Users WHERE id = $1 AND verified_status = true', [id]);
+
+        if (verifiedUser.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'Verified user not found or not verified' });
+        }
+
+        res.status(200).json({
+            error: false,
+            msg: 'Verified user fetched successfully',
+            data: verifiedUser.rows[0],
+        });
+    } catch (error) {
+        console.error('Error fetching verified user:', error);
+        res.status(500).json({ error: true, msg: 'Internal Server Error' });
+    }
+};
+
+const getDashboardprofiles = async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
+
+    try {
+        // Calculate the OFFSET based on the page and limit
+        const offset = (page - 1) * limit;
+
+        const query = 'SELECT * FROM users'; // Replace 'users' with your actual table name
+        const result = await pool.query(`${query} WHERE deleted_status = false OFFSET ${offset} LIMIT ${limit}`);
+        const allUsers = result.rows;
+
+        // Extract gender and country values from the first user (assuming at least one user exists)
+        const { gender, country, dob: referenceDOBStr } = allUsers[0];
+
+        // Extract year from reference DOB
+        const referenceYear = new Date(referenceDOBStr).getFullYear();
+
+        // Find users whose age difference is within ±5 years
+        const similarUsers = allUsers.filter(user => {
+            const userYear = new Date(user.dob).getFullYear();
+            const ageDifference = referenceYear - userYear;
+
+            return !isNaN(ageDifference) && Math.abs(ageDifference) <= 5; // Check if the absolute age difference is within 5 years
+        });
+
+        if (similarUsers.length > 0) {
+            return res.json({
+                msg: "Profile fetched succussfully",
+                error: false,
+                count: similarUsers.length,
+                data: similarUsers
+            });
+        } else {
+            return res.json({
+                msg: "No users found with age difference within ±5 years",
+                error: false,
+                count: 0,
+                data: []
+            });
+        }
+    } catch (error) {
+        return res.status(500).json({
+            msg: "Internal server error",
+            error: true
+        });
+    }
+}
+
+module.exports = { usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, updatepassword, deleteuser, getalldeletedusers, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles };

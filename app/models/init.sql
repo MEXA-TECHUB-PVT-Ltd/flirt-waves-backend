@@ -26,7 +26,12 @@ CREATE TABLE IF NOT EXISTS Users (
   opinion_on_smoking VARCHAR(255),
   about_kids VARCHAR(255),
   eating_habits VARCHAR(255),
+  gender VARCHAR(255),
+  dob VARCHAR(255),
   country VARCHAR(255),
+  block_status BOOLEAN DEFAULT false, 
+  verified_status BOOLEAN DEFAULT false,
+  report_status BOOLEAN DEFAULT false, 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
 ); 
@@ -58,3 +63,65 @@ CREATE TABLE IF NOT EXISTS Habits (
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
 ); 
+
+CREATE TABLE IF NOT EXISTS Exercise (
+  id SERIAL PRIMARY KEY,
+  exercise VARCHAR(255), 
+  created_at timestamp DEFAULT NOW(),
+  updated_at timestamp DEFAULT NOW()
+); 
+
+CREATE TABLE IF NOT EXISTS Hobbies (
+  id SERIAL PRIMARY KEY,
+  hobby VARCHAR(255), 
+  created_at timestamp DEFAULT NOW(),
+  updated_at timestamp DEFAULT NOW()
+); 
+
+CREATE TABLE IF NOT EXISTS Nightlife (
+  id SERIAL PRIMARY KEY,
+  night_life VARCHAR(255), 
+  created_at timestamp DEFAULT NOW(),
+  updated_at timestamp DEFAULT NOW()
+); 
+
+CREATE TABLE IF NOT EXISTS Kids (
+  id SERIAL PRIMARY KEY,
+  kids_opinion VARCHAR(255), 
+  created_at timestamp DEFAULT NOW(),
+  updated_at timestamp DEFAULT NOW()
+); 
+
+CREATE TABLE IF NOT EXISTS Smoking (
+  id SERIAL PRIMARY KEY,
+  smoking_opinion VARCHAR(255), 
+  created_at timestamp DEFAULT NOW(),
+  updated_at timestamp DEFAULT NOW()
+); 
+
+CREATE TABLE IF NOT EXISTS ReportUsers (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  reason VARCHAR(255), 
+  description VARCHAR(255), 
+  created_at timestamp DEFAULT NOW(),
+  updated_at timestamp DEFAULT NOW()
+); 
+
+CREATE TABLE IF NOT EXISTS Matches (
+  id SERIAL PRIMARY KEY,
+  user1_id INTEGER NOT NULL,
+  user2_id INTEGER NOT NULL,
+  match_value INTEGER,
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
+
+CREATE TABLE IF NOT EXISTS Favorites (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER NOT NULL,
+  favorite_user_id INTEGER NOT NULL,
+  created_at TIMESTAMP DEFAULT NOW(),
+  FOREIGN KEY (user_id) REFERENCES Users(id),
+  FOREIGN KEY (favorite_user_id) REFERENCES Users(id)
+);
