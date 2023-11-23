@@ -178,7 +178,7 @@ const getalluserbyID = async (req, res) => {
         const user = result.rows[0];
         return res.status(200).json({ msg: "User fetched", data: user, error: false });
     });
-}
+} 
 
 const updateuserprofile = async (req, res) => {
     const { id } = req.params; // Assuming the user ID is passed as a parameter
@@ -654,4 +654,97 @@ const getDashboardprofiles = async (req, res) => {
     }
 }
 
-module.exports = { usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, updatepassword, deleteuser, getalldeletedusers, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles };
+const getrecentprofiles = async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
+
+    // Calculate the OFFSET based on the page and limit
+    const offset = (page - 1) * limit;
+
+    // Get current time in UTC
+    const currentTimeUTC = new Date().toISOString();
+
+    // Calculate time 24 hours ago in UTC
+    const twentyFourHoursAgo = new Date(new Date().getTime() - 24 * 60 * 60 * 1000).toISOString();
+
+    let query = `
+        SELECT *
+        FROM Users
+        WHERE deleted_status = false
+        AND created_at BETWEEN '${twentyFourHoursAgo}' AND '${currentTimeUTC}'
+    `;
+
+    // Check if pagination parameters are provided
+    if (page && limit) {
+        query += `
+            OFFSET ${offset}
+            LIMIT ${limit}
+        `;
+    } 
+
+    pool.query(query, (err, result) => {
+        if (err) {
+            console.error('Error fetching users created in last 24 hours:', err);
+            return res.status(500).json({ msg: 'Internal server error', error: true });
+        }
+    
+        const usersInLast24Hours = result.rows;
+        console.log('Users fetched in the last 24 hours:', usersInLast24Hours); // Log fetched users for debugging
+        return res.status(200).json({
+            msg: "Recently Added users",
+            error: false,
+            count: usersInLast24Hours.length,
+            data: usersInLast24Hours
+        });
+    });
+}
+
+const getCurrentlyOnlineUsers = async (req, res) => {
+    // Calculate time 5 minutes ago in UTC
+    const fiveMinutesAgo = new Date(new Date().getTime() - 5 * 60 * 1000).toISOString();
+
+    const query = `
+        SELECT user_id
+        FROM UserActivity
+        WHERE last_active_at > '${fiveMinutesAgo}'
+    `;
+
+    pool.query(query, (err, result) => {
+        if (err) {
+            console.error('Error fetching currently online users:', err);
+            return res.status(500).json({ msg: 'Internal server error', error: true });
+        }
+
+        const onlineUsers = result.rows;
+        return res.status(200).json({
+            msg: "Currently online users fetched successfully",
+            error: false,
+            count: onlineUsers.length,
+            data: onlineUsers
+        });
+    });
+};
+
+const searchUserByName = async (req, res) => {
+    const { name } = req.body;
+
+    try {
+        if (!name || typeof name !== 'string') {
+            return res.status(400).json({ error: true, msg: 'Invalid search parameter' });
+        }
+
+        // Perform a search query based on the provided name
+        const users = await pool.query('SELECT * FROM Users WHERE name ILIKE $1', [`%${name}%`]);
+
+        if (users.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'No users found with that name' });
+        }
+
+        res.status(200).json({ error: false, msg: 'Users found', data: users.rows });
+
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
+module.exports = { usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, updatepassword, deleteuser, getalldeletedusers, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles,getCurrentlyOnlineUsers,searchUserByName };

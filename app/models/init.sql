@@ -16,25 +16,28 @@ CREATE TABLE IF NOT EXISTS Users (
   signup_type VARCHAR(255), 
   image VARCHAR(255),
   device_id VARCHAR(255),
-  deleted_status BOOLEAN DEFAULT false, 
-  looking_for VARCHAR(255),
-  height VARCHAR(255),
-  exercise VARCHAR(255),
-  cooking_skills VARCHAR(255),
-  explains_you VARCHAR(255),
-  night_life VARCHAR(255),
-  opinion_on_smoking VARCHAR(255),
-  about_kids VARCHAR(255),
-  eating_habits VARCHAR(255),
+  deleted_status BOOLEAN DEFAULT false,  
   gender VARCHAR(255),
-  dob VARCHAR(255),
-  country VARCHAR(255),
+  relation_type VARCHAR(255),
+  cooking_skill VARCHAR(255),
+  habit VARCHAR(255),
+  exercise VARCHAR(255),
+  hobby VARCHAR(255),
+  night_life VARCHAR(255),
+  smoking_opinion VARCHAR(255),
+  kids_opinion VARCHAR(255),
   block_status BOOLEAN DEFAULT false, 
   verified_status BOOLEAN DEFAULT false,
   report_status BOOLEAN DEFAULT false, 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
 ); 
+
+CREATE TABLE IF NOT EXISTS UserActivity (
+    id SERIAL PRIMARY KEY,
+    user_id INT REFERENCES Users(id),
+    last_active_at TIMESTAMP
+);
 
 CREATE TABLE IF NOT EXISTS Gender (
   id SERIAL PRIMARY KEY,
@@ -45,10 +48,11 @@ CREATE TABLE IF NOT EXISTS Gender (
  
 CREATE TABLE IF NOT EXISTS Relationship (
   id SERIAL PRIMARY KEY,
+  user_id INTEGER,
   relation_type VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
-); 
+);  
 
 CREATE TABLE IF NOT EXISTS Cookingskill (
   id SERIAL PRIMARY KEY,
@@ -98,6 +102,15 @@ CREATE TABLE IF NOT EXISTS Smoking (
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
 ); 
+
+CREATE TABLE IF NOT EXISTS UserRelationships (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER REFERENCES Users(id),
+  relationship_id INTEGER REFERENCES Relationship(id),
+  gender_id INTEGER REFERENCES Gender(id),
+  created_at TIMESTAMP DEFAULT NOW(),
+  updated_at TIMESTAMP DEFAULT NOW()
+);
 
 CREATE TABLE IF NOT EXISTS ReportUsers (
   id SERIAL PRIMARY KEY,

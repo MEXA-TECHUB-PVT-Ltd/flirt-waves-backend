@@ -17,6 +17,9 @@ router.post('/get_preferences_with_filters', userController.getUsersWithFilters)
 router.put('/updateuser_verificationstatus/:id', userController.updateUserVerifiedStatus);
 router.get('/get_verified_users', userController.getVerifiedUsers);
 router.get('/get_verified_user/:id', userController.getVerifiedUserById);
-router.get('/getall_dashboard_profiles', userController.getDashboardprofiles); 
+router.get('/getall_dashboard_profiles', userController.getDashboardprofiles);
+router.get('/get_recent_profiles', userController.getrecentprofiles);
+router.get('/get_onlineusers', userController.getCurrentlyOnlineUsers); 
+router.post('/searchuser_byname', userController.searchUserByName);    
 
 module.exports = router;
