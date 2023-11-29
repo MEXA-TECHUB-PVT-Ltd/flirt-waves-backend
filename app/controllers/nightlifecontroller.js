@@ -127,4 +127,44 @@ const getNightlifeByID = async (req, res) => {
     }
 };
 
-module.exports = { addnightlife, updatenightlife, deletenightlife, getAllNightlifes, getNightlifeByID };
+const getusersofnightlifeopinion = async (req, res) => {
+    const { nightlife_id } = req.body;
+
+    if (!nightlife_id) {
+        return res.status(400).json({ error: true, msg: 'Nightlife ID is missing in the request body' });
+    }
+
+    try {
+        // Check if the ID exists in the Users table
+        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistResult = await pool.query(userExistQuery, [nightlife_id]);
+
+        if (userExistResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        }
+
+        // Fetch users associated with the nightlife_id
+        const usersQuery = 'SELECT * FROM Users WHERE night_life = $1';
+        const usersResult = await pool.query(usersQuery, [nightlife_id]);
+
+        // Fetch nightlife opinion details for the provided nightlife_id
+        const nightlifeQuery = 'SELECT * FROM Nightlife WHERE id = $1';
+        const nightlifeResult = await pool.query(nightlifeQuery, [nightlife_id]);
+
+        const usersData = usersResult.rows;
+        const nightlifeData = nightlifeResult.rows;
+
+        const response = {
+            error: false,
+            users: usersData,
+            nightlife_opinion_details: nightlifeData,
+        };
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Error:', error.message);
+        res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
+module.exports = { addnightlife, updatenightlife, deletenightlife, getAllNightlifes, getNightlifeByID, getusersofnightlifeopinion };

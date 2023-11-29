@@ -6,6 +6,7 @@ router.post('/add_kidsopinion', kidsController.addkidsopinion);
 router.put('/update_kidsopinion/:id', kidsController.updatekidsopinion);
 router.delete('/delete_kidsopinion/:id', kidsController.deletekidsopinion);
 router.get('/getall_kidsopinions', kidsController.getAllkidopinions);  
-router.get('/get_kidopinionbyID/:id', kidsController.getKidopinionByID);  
+router.get('/get_kidopinionbyID/:id', kidsController.getKidopinionByID);
+router.post('/get_usersof_kidopinion', kidsController.getusersofkidopinion);   
 
 module.exports = router;

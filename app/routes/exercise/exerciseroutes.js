@@ -5,6 +5,7 @@ const exerciseController = require("../../controllers/exercisecontroller");
 router.post('/add_exercise', exerciseController.addexercise);
 router.put('/update_exercise/:id', exerciseController.updateexercise);
 router.delete('/delete_exercise/:id', exerciseController.deleteexercise);
-router.get('/getall_exercises', exerciseController.getAllexercises);  
+router.get('/getall_exercises', exerciseController.getAllexercises); 
+router.post('/get_usersof_exercise', exerciseController.getusersofexercise);   
 
 module.exports = router;

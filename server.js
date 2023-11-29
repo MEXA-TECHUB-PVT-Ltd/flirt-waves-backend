@@ -1,8 +1,8 @@
 const express = require('express');
 const cors = require('cors');
 const multer = require('multer');
-const path = require('path');
 const fs = require('fs');
+const path = require('path');
 const dotenv = require('dotenv')
 const bodyParser = require("body-parser");
 
@@ -11,7 +11,7 @@ const imageUploadRouter = require('./app/uploadimage');
 
 const app = express();
 // const io = socketIo(server);
-const port = 4000;
+const port = 5000;
 
 dotenv.config();
 
@@ -23,6 +23,50 @@ app.use(cors({
 
 app.use(express.json())
 
+const createDirectory = (directory) => {
+    if (!fs.existsSync(directory)) {
+      fs.mkdirSync(directory, { recursive: true });
+    }
+  };
+  
+  // Directory for uploads
+  const uploadDirectory = './uploads';
+  createDirectory(uploadDirectory); // Create the directory if it doesn't exist
+  
+  // Set storage engine
+  const storage = multer.diskStorage({
+    destination: function (req, file, cb) {
+      cb(null, uploadDirectory);
+    },
+    filename: function (req, file, cb) {
+      cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
+    }
+  });
+  
+  // Initialize multer upload
+  const upload = multer({
+    storage: storage,
+    limits: { fileSize: 1024 * 1024 * 5 }, // Limit file size if needed
+    fileFilter: function (req, file, cb) {
+      if (file.mimetype.startsWith('image/')) {
+        cb(null, true);
+      } else {
+        cb(new Error('Only images are allowed'));
+      }
+    }
+  });
+  
+  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+
+// Your existing endpoint for uploading images
+app.post('/upload', upload.array('images', 5), (req, res) => {
+  if (!req.files || req.files.length === 0) {
+    return res.status(400).json({ error: true, msg: 'No images uploaded' });
+  }
+
+  const filepaths = req.files.map(file => file.path);
+  res.status(200).json({ error: false, msg: 'Images uploaded successfully', files: filepaths });
+});
 // app.use('/uploadimage', imageUploadRouter); 
 
 
@@ -40,6 +84,7 @@ app.use("/smoking", require("./app/routes/smoking/smokingroutes"));
 app.use("/report", require("./app/routes/reportusers/reportusersroutes"));
 app.use("/matches", require("./app/routes/matches/matchesroutes"));
 app.use("/favourites", require("./app/routes/favourite/favouriteroutes"));
+app.use("/crush", require("./app/routes/crush/crushroutes"));
 
 app.get('/', (req, res) => {
     res.json({ message: 'Flirt Waves !' });

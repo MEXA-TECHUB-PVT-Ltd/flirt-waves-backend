@@ -99,4 +99,44 @@ const getAllcookingskill = async (req, res) => {
     }
 };
 
-module.exports = { addCookingskill, updatecookingskill, deleteCookingskill, getAllcookingskill };
+const getusersofcookingskill = async (req, res) => {
+    const { cooking_skill_id } = req.body;
+
+    if (!cooking_skill_id) {
+        return res.status(400).json({ error: true, msg: 'Cooking skill ID is missing in the request body' });
+    }
+
+    try {
+        // Check if the ID exists in the Users table
+        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistResult = await pool.query(userExistQuery, [cooking_skill_id]);
+
+        if (userExistResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        }
+
+        // Fetch users associated with the cooking_skill_id
+        const usersQuery = 'SELECT * FROM Users WHERE cooking_skill = $1';
+        const usersResult = await pool.query(usersQuery, [cooking_skill_id]);
+
+        // Fetch cooking skill details for the provided cooking_skill_id
+        const cookingSkillQuery = 'SELECT * FROM Cookingskill WHERE id = $1';
+        const cookingSkillResult = await pool.query(cookingSkillQuery, [cooking_skill_id]);
+
+        const usersData = usersResult.rows;
+        const cookingSkillData = cookingSkillResult.rows;
+
+        const response = {
+            error: false,
+            users: usersData,
+            cooking_skill_details: cookingSkillData,
+        };
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Error:', error.message);
+        res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
+module.exports = { addCookingskill, updatecookingskill, deleteCookingskill, getAllcookingskill, getusersofcookingskill };

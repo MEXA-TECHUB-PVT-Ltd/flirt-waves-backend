@@ -127,4 +127,44 @@ const getHobbyById = async (req, res) => {
     }
 };
 
-module.exports = { addhobby, updatehobby, deletehobby, getAllHobbiess, getHobbyById };
+const getusersofhobby = async (req, res) => {
+    const { hobby_id } = req.body;
+
+    if (!hobby_id) {
+        return res.status(400).json({ error: true, msg: 'Hobby ID is missing in the request body' });
+    }
+
+    try {
+        // Check if the ID exists in the Users table
+        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistResult = await pool.query(userExistQuery, [hobby_id]);
+
+        if (userExistResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        }
+
+        // Fetch users associated with the hobby_id
+        const usersQuery = 'SELECT * FROM Users WHERE hobby = $1';
+        const usersResult = await pool.query(usersQuery, [hobby_id]);
+
+        // Fetch hobby details for the provided hobby_id
+        const hobbyQuery = 'SELECT * FROM Hobbies WHERE id = $1';
+        const hobbyResult = await pool.query(hobbyQuery, [hobby_id]);
+
+        const usersData = usersResult.rows;
+        const hobbyData = hobbyResult.rows;
+
+        const response = {
+            error: false,
+            users: usersData,
+            hobby_details: hobbyData,
+        };
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Error:', error.message);
+        res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
+module.exports = { addhobby, updatehobby, deletehobby, getAllHobbiess, getHobbyById, getusersofhobby };

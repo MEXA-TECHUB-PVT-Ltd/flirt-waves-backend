@@ -17,21 +17,32 @@ CREATE TABLE IF NOT EXISTS Users (
   image VARCHAR(255),
   device_id VARCHAR(255),
   deleted_status BOOLEAN DEFAULT false,  
+  block_status BOOLEAN DEFAULT false,  
   gender VARCHAR(255),
   relation_type VARCHAR(255),
   cooking_skill VARCHAR(255),
   habit VARCHAR(255),
   exercise VARCHAR(255),
-  hobby VARCHAR(255),
-  night_life VARCHAR(255),
+  hobby VARCHAR(255), 
   smoking_opinion VARCHAR(255),
   kids_opinion VARCHAR(255),
-  block_status BOOLEAN DEFAULT false, 
+  night_life VARCHAR(255),
+  interested_in VARCHAR(255), 
   verified_status BOOLEAN DEFAULT false,
   report_status BOOLEAN DEFAULT false, 
   created_at timestamp DEFAULT NOW(),
-  updated_at timestamp DEFAULT NOW()
+  updated_at timestamp DEFAULT NOW(),
+  last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ); 
+
+CREATE TABLE IF NOT EXISTS userscrushes (
+  id SERIAL PRIMARY KEY,
+  user_id INTEGER,
+  crush_id INTEGER,
+  created_at TIMESTAMP DEFAULT NOW(),
+  FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+  FOREIGN KEY (crush_id) REFERENCES users(id) ON DELETE CASCADE
+);
 
 CREATE TABLE IF NOT EXISTS UserActivity (
     id SERIAL PRIMARY KEY,
