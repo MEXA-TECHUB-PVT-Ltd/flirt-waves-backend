@@ -99,4 +99,44 @@ const getAllexercises = async (req, res) => {
     }
 };
 
-module.exports = { addexercise, updateexercise, deleteexercise,getAllexercises };
+const getusersofexercise = async (req, res) => {
+    const { exercise_id } = req.body;
+
+    if (!exercise_id) {
+        return res.status(400).json({ error: true, msg: 'Exercise ID is missing in the request body' });
+    }
+
+    try {
+        // Check if the ID exists in the Users table
+        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistResult = await pool.query(userExistQuery, [exercise_id]);
+
+        if (userExistResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        }
+
+        // Fetch users associated with the exercise_id
+        const usersQuery = 'SELECT * FROM Users WHERE exercise = $1';
+        const usersResult = await pool.query(usersQuery, [exercise_id]);
+
+        // Fetch exercise details for the provided exercise_id
+        const exerciseQuery = 'SELECT * FROM Exercise WHERE id = $1';
+        const exerciseResult = await pool.query(exerciseQuery, [exercise_id]);
+
+        const usersData = usersResult.rows;
+        const exerciseData = exerciseResult.rows;
+
+        const response = {
+            error: false,
+            users: usersData,
+            exercise_details: exerciseData,
+        };
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Error:', error.message);
+        res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
+module.exports = { addexercise, updateexercise, deleteexercise,getAllexercises,getusersofexercise };

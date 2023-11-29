@@ -127,4 +127,44 @@ const getSmokingopinionByID = async (req, res) => {
     }
 };
 
-module.exports = { addsmokingopinion, updateSmokingopinion, deleteSmokingopinion, getAllSmokingopinions, getSmokingopinionByID };
+const getusersofsmokingopinion = async (req, res) => {
+    const { smoking_id } = req.body;
+
+    if (!smoking_id) {
+        return res.status(400).json({ error: true, msg: 'Smoking ID is missing in the request body' });
+    }
+
+    try {
+        // Check if the ID exists in the Users table
+        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistResult = await pool.query(userExistQuery, [smoking_id]);
+
+        if (userExistResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        }
+
+        // Fetch users associated with the smoking_id
+        const usersQuery = 'SELECT * FROM Users WHERE smoking_opinion = $1';
+        const usersResult = await pool.query(usersQuery, [smoking_id]);
+
+        // Fetch smoking opinion details for the provided smoking_id
+        const smokingQuery = 'SELECT * FROM Smoking WHERE id = $1';
+        const smokingResult = await pool.query(smokingQuery, [smoking_id]);
+
+        const usersData = usersResult.rows;
+        const smokingData = smokingResult.rows;
+
+        const response = {
+            error: false,
+            users: usersData,
+            smoking_opinion_details: smokingData,
+        };
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Error:', error.message);
+        res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
+module.exports = { addsmokingopinion, updateSmokingopinion, deleteSmokingopinion, getAllSmokingopinions, getSmokingopinionByID, getusersofsmokingopinion };

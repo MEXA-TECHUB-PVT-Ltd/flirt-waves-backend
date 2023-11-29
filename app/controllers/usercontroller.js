@@ -41,31 +41,19 @@ const usersignup = async (req, res) => {
             // Hash the password before storing it in the database
             hashedPassword = await bcrypt.hash(password, 10); // You can adjust the number of rounds for security
         } else if (signup_type === 'google' || signup_type === 'apple') {
-            // For Google or Apple signups, set password to null and use the provided token
+            // For Google or Facebook signups, set password to null and use the provided token
             hashedPassword = null;
-            tokenValue = token; // Use the provided token for Google or Apple signups
+            tokenValue = token; // Use the provided token for Google or Facebook signups
         }
 
         // Insert the user into the database
         const result = await pool.query(
-            'INSERT INTO Users (name, email, password, token, signup_type, device_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
-            [name, email, hashedPassword, tokenValue, signup_type, device_id]
+            'INSERT INTO Users (name, email, password, signup_type, token, device_id) VALUES ($1, $2, $3, $4, $5, $6) RETURNING *',
+            [name, email, hashedPassword, signup_type, tokenValue, device_id]
         );
 
-        const newUser = result.rows[0];
-
-        // Send a thank you email after signup 
-        const mailOptions = {
-            from: 'mahreentassawar@gmail.com',
-            to: email,
-            subject: 'Thankyou Email !',
-            text: `Thanks For Registrion We Will Soon Come Back To You.`,
-        };
-
-        await transporter.sendMail(mailOptions);
-        // Function to send the thank you email
-
-        res.status(201).json({ error: false, msg: 'User signed up successfully', data: newUser });
+        const userId = result.rows[0];
+        res.status(201).json({ error: false, msg: 'User signed up successfully', data: userId });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: true, msg: 'Internal server error' });
@@ -113,6 +101,8 @@ const usersignin = async (req, res) => {
             }
         }
 
+        await pool.query('UPDATE Users SET last_active = CURRENT_TIMESTAMP WHERE email = $1', [email]);
+
         res.status(200).json({ error: false, msg: 'Login successful', data: userData });
 
     } catch (error) {
@@ -128,10 +118,31 @@ const getallusers = async (req, res) => {
     const offset = (page - 1) * limit;
 
     let query = `
-        SELECT *
-        FROM Users
-        WHERE deleted_status = false
-    `;
+    SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image,
+           u.device_id, u.deleted_status, u.block_status,
+           g.gender AS gender_details,
+           r.relation_type AS relation_type_details,
+           c.cooking_skill AS cooking_skill_details,
+           h.habit AS habit_details,
+           e.exercise AS exercise_details,
+           hb.hobby AS hobby_details,
+           s.smoking_opinion AS smoking_opinion_details,
+           k.kids_opinion AS kids_opinion_details,
+           n.night_life AS night_life_details,
+           u.interested_in, u.verified_status, u.report_status,
+           u.created_at, u.updated_at
+    FROM Users u
+    LEFT JOIN Gender g ON u.gender::text = g.id::text
+    LEFT JOIN Relationship r ON u.relation_type::text = r.id::text
+    LEFT JOIN Cookingskill c ON u.cooking_skill::text = c.id::text
+    LEFT JOIN Habits h ON u.habit::text = h.id::text
+    LEFT JOIN Exercise e ON u.exercise::text = e.id::text
+    LEFT JOIN Hobbies hb ON u.hobby::text = hb.id::text
+    LEFT JOIN Smoking s ON u.smoking_opinion::text = s.id::text
+    LEFT JOIN Kids k ON u.kids_opinion::text = k.id::text
+    LEFT JOIN Nightlife n ON u.night_life::text = n.id::text
+    WHERE u.deleted_status = false
+`;
 
     // Check if pagination parameters are provided
     if (page && limit) {
@@ -141,33 +152,66 @@ const getallusers = async (req, res) => {
         `;
     }
 
-    pool.query(query, (err, result) => {
+    pool.query(query, async (err, result) => {
         if (err) {
             console.error('Error fetching users:', err);
             return res.status(500).json({ msg: 'Internal server error', error: true });
         }
 
         const users = result.rows;
+        const processedUsers = await Promise.all(users.map(async (user) => {
+            const processedUser = { ...user };
+
+            // Modify user details to embed associated details if available
+            if (user.gender_details !== null) {
+                processedUser.gender_details = await fetchGenderDetails(user.gender_details);
+                // Fetch other details in a similar manner
+            }
+            return processedUser;
+        }));
+
         return res.status(200).json({
-            msg: "Users fetched successfully",
+            msg: 'Users fetched successfully',
             error: false,
-            count: users.length,
-            data: users
+            count: processedUsers.length,
+            data: processedUsers,
         });
     });
 }
 
 const getalluserbyID = async (req, res) => {
-    const userID = req.params.id;
+    const userId = req.params.id; // Assuming the user ID is passed as a route parameter
 
-    const query = `
-        SELECT *
-        FROM Users WHERE id = $1
+    let query = `
+    SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image,
+           u.device_id, u.deleted_status, u.block_status,
+           g.gender AS gender_details,
+           r.relation_type AS relation_type_details,
+           c.cooking_skill AS cooking_skill_details,
+           h.habit AS habit_details,
+           e.exercise AS exercise_details,
+           hb.hobby AS hobby_details,
+           s.smoking_opinion AS smoking_opinion_details,
+           k.kids_opinion AS kids_opinion_details,
+           n.night_life AS night_life_details,
+           u.interested_in, u.verified_status, u.report_status,
+           u.created_at, u.updated_at
+    FROM Users u
+    LEFT JOIN Gender g ON u.gender::text = g.id::text
+    LEFT JOIN Relationship r ON u.relation_type::text = r.id::text
+    LEFT JOIN Cookingskill c ON u.cooking_skill::text = c.id::text
+    LEFT JOIN Habits h ON u.habit::text = h.id::text
+    LEFT JOIN Exercise e ON u.exercise::text = e.id::text
+    LEFT JOIN Hobbies hb ON u.hobby::text = hb.id::text
+    LEFT JOIN Smoking s ON u.smoking_opinion::text = s.id::text
+    LEFT JOIN Kids k ON u.kids_opinion::text = k.id::text
+    LEFT JOIN Nightlife n ON u.night_life::text = n.id::text
+    WHERE u.id = $1 AND u.deleted_status = false
     `;
 
-    pool.query(query, [userID], (err, result) => {
+    pool.query(query, [userId], async (err, result) => {
         if (err) {
-            console.error('Error fetching user:', err);
+            console.error('Error fetching user by ID:', err);
             return res.status(500).json({ msg: 'Internal server error', error: true });
         }
 
@@ -176,9 +220,21 @@ const getalluserbyID = async (req, res) => {
         }
 
         const user = result.rows[0];
-        return res.status(200).json({ msg: "User fetched", data: user, error: false });
+        const processedUser = { ...user };
+
+        // Modify user details to embed associated details if available
+        if (user.gender_details !== null) {
+            processedUser.gender_details = user.gender_details; // Assuming gender_details field contains the gender value directly
+            // Fetch other details in a similar manner
+        }
+
+        return res.status(200).json({
+            msg: 'User fetched successfully',
+            error: false,
+            data: processedUser,
+        });
     });
-} 
+}
 
 const updateuserprofile = async (req, res) => {
     const { id } = req.params; // Assuming the user ID is passed as a parameter
@@ -476,52 +532,41 @@ const updateUserBlockStatus = async (req, res) => {
 };
 
 const getUsersWithFilters = async (req, res) => {
-    const { gender, country, height, looking_for } = req.body;
+
+    const { name } = req.body;
 
     try {
-        // Base query to fetch users with provided filters
-        let filterQuery = 'SELECT * FROM Users WHERE';
+        const query = `
+    SELECT 'Gender' as table_name, id, gender as matched_field FROM Gender WHERE gender ILIKE $1
+    UNION ALL
+    SELECT 'Relationship' as table_name, id, relation_type as matched_field FROM Relationship WHERE relation_type ILIKE $1
+    UNION ALL
+    SELECT 'Cookingskill' as table_name, id, cooking_skill as matched_field FROM Cookingskill WHERE cooking_skill ILIKE $1
+    UNION ALL 
+    SELECT 'Habits' as table_name, id, habit as matched_field FROM Habits WHERE habit ILIKE $1
+    UNION ALL
+    SELECT 'Exercise' as table_name, id, exercise as matched_field FROM Exercise WHERE exercise ILIKE $1
+    UNION ALL
+    SELECT 'Hobbies' as table_name, id, hobby as matched_field FROM Hobbies WHERE hobby ILIKE $1
+    UNION ALL
+    SELECT 'Nightlife' as table_name, id, night_life as matched_field FROM Nightlife WHERE night_life ILIKE $1
+    UNION ALL
+    SELECT 'Kids' as table_name, id, kids_opinion as matched_field FROM Kids WHERE kids_opinion ILIKE $1
+    UNION ALL
+    SELECT 'Smoking' as table_name, id, smoking_opinion as matched_field FROM Smoking WHERE smoking_opinion ILIKE $1
+  `;
 
-        const filters = [];
-        const values = [];
+        const { rows } = await pool.query(query, [`%${name}%`]);
 
-        // Constructing query based on provided filters
-        if (gender) {
-            filters.push('gender = $1');
-            values.push(gender);
-        }
-        if (country) {
-            filters.push('country = $' + (values.length + 1));
-            values.push(country);
-        }
-        if (height) {
-            filters.push('height = $' + (values.length + 1));
-            values.push(height);
-        }
-        if (looking_for) {
-            filters.push('looking_for = $' + (values.length + 1));
-            values.push(looking_for);
-        }
-
-        // Combining all filters into the query
-        if (filters.length > 0) {
-            filterQuery += ' ' + filters.join(' AND ');
+        if (rows.length > 0) {
+            res.json({ error: false, data: rows.map(row => ({ id: row.id, value: row.matched_field })) });
         } else {
-            filterQuery += ' 1 = 1'; // To avoid syntax errors, a default condition if no filters are provided
+            res.status(404).json({ error: true, msg: 'No matching records found.' });
         }
-
-        const filteredUsers = await pool.query(filterQuery, values);
-
-        return res.status(200).json({
-            message: 'Filtered users fetched successfully',
-            error: false,
-            count: filteredUsers.rowCount,
-            data: filteredUsers.rows,
-        });
     } catch (error) {
-        console.error('Error fetching filtered users:', error);
-        return res.status(500).json({ error: true, msg: 'Internal server error' });
+        res.status(500).json({ error: true, msg: 'Internal server error.' });
     }
+
 };
 
 const updateUserVerifiedStatus = async (req, res) => {
@@ -679,14 +724,14 @@ const getrecentprofiles = async (req, res) => {
             OFFSET ${offset}
             LIMIT ${limit}
         `;
-    } 
+    }
 
     pool.query(query, (err, result) => {
         if (err) {
             console.error('Error fetching users created in last 24 hours:', err);
             return res.status(500).json({ msg: 'Internal server error', error: true });
         }
-    
+
         const usersInLast24Hours = result.rows;
         console.log('Users fetched in the last 24 hours:', usersInLast24Hours); // Log fetched users for debugging
         return res.status(200).json({
@@ -699,29 +744,32 @@ const getrecentprofiles = async (req, res) => {
 }
 
 const getCurrentlyOnlineUsers = async (req, res) => {
-    // Calculate time 5 minutes ago in UTC
-    const fiveMinutesAgo = new Date(new Date().getTime() - 5 * 60 * 1000).toISOString();
+    const { page = 1, limit = 10 } = req.query;
 
-    const query = `
-        SELECT user_id
-        FROM UserActivity
-        WHERE last_active_at > '${fiveMinutesAgo}'
-    `;
+    // Calculate the OFFSET based on the page and limit
+    const offset = (page - 1) * limit;
 
-    pool.query(query, (err, result) => {
-        if (err) {
-            console.error('Error fetching currently online users:', err);
-            return res.status(500).json({ msg: 'Internal server error', error: true });
-        }
+    try {
+        // Calculate the timestamp for 5 minutes ago
+        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
-        const onlineUsers = result.rows;
-        return res.status(200).json({
-            msg: "Currently online users fetched successfully",
+        // Fetch users who have been active within the last 5 minutes with pagination
+        const onlineUsers = await pool.query('SELECT * FROM Users WHERE last_active > $1 OFFSET $2 LIMIT $3', [
+            fiveMinutesAgo,
+            offset,
+            limit,
+        ]);
+
+        res.status(200).json({
             error: false,
-            count: onlineUsers.length,
-            data: onlineUsers
+            msg: 'Online users within the last 5 minutes with pagination',
+            count: onlineUsers.rows.length,
+            data: onlineUsers.rows,
         });
-    });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
 };
 
 const searchUserByName = async (req, res) => {
@@ -732,7 +780,7 @@ const searchUserByName = async (req, res) => {
             return res.status(400).json({ error: true, msg: 'Invalid search parameter' });
         }
 
-        // Perform a search query based on the provided name
+        // Perform a search query based on the provided name using ILIKE for pattern matching
         const users = await pool.query('SELECT * FROM Users WHERE name ILIKE $1', [`%${name}%`]);
 
         if (users.rows.length === 0) {
@@ -747,4 +795,4 @@ const searchUserByName = async (req, res) => {
     }
 };
 
-module.exports = { usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, updatepassword, deleteuser, getalldeletedusers, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles,getCurrentlyOnlineUsers,searchUserByName };
+module.exports = { usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, updatepassword, deleteuser, getalldeletedusers, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName };

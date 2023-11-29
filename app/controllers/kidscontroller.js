@@ -127,4 +127,44 @@ const getKidopinionByID = async (req, res) => {
     }
 };
 
-module.exports = { addkidsopinion, updatekidsopinion, deletekidsopinion, getAllkidopinions, getKidopinionByID };
+const getusersofkidopinion = async (req, res) => {
+    const { kids_id } = req.body;
+
+    if (!kids_id) {
+        return res.status(400).json({ error: true, msg: 'Kids ID is missing in the request body' });
+    }
+
+    try {
+        // Check if the ID exists in the Users table
+        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistResult = await pool.query(userExistQuery, [kids_id]);
+
+        if (userExistResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        }
+
+        // Fetch users associated with the kids_id
+        const usersQuery = 'SELECT * FROM Users WHERE kids_opinion = $1';
+        const usersResult = await pool.query(usersQuery, [kids_id]);
+
+        // Fetch kids opinion details for the provided kids_id
+        const kidsQuery = 'SELECT * FROM Kids WHERE id = $1';
+        const kidsResult = await pool.query(kidsQuery, [kids_id]);
+
+        const usersData = usersResult.rows;
+        const kidsData = kidsResult.rows;
+
+        const response = {
+            error: false,
+            users: usersData,
+            kids_opinion_details: kidsData,
+        };
+
+        res.status(200).json(response);
+    } catch (error) {
+        console.error('Error:', error.message);
+        res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
+module.exports = { addkidsopinion, updatekidsopinion, deletekidsopinion, getAllkidopinions, getKidopinionByID, getusersofkidopinion };

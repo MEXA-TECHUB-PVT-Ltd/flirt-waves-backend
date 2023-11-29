@@ -6,6 +6,6 @@ router.post('/add_relation', relationshipController.createRelationship);
 router.put('/update_relation/:id', relationshipController.updateRelationship);
 router.delete('/delete_relation/:id', relationshipController.deleteRelationship);
 router.get('/getall_relations', relationshipController.getAllRelationships);
-router.post('/add_user_relation', relationshipController.addpreferncerToUser);
+router.post('/get_users_relation', relationshipController.getusersofrelationtype);
 
 module.exports = router;
