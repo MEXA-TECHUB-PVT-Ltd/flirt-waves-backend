@@ -41,8 +41,11 @@ CREATE TABLE IF NOT EXISTS userscrushes (
   crush_id INTEGER,
   created_at TIMESTAMP DEFAULT NOW(),
   FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-  FOREIGN KEY (crush_id) REFERENCES users(id) ON DELETE CASCADE
+  FOREIGN KEY (crush_id) REFERENCES users(id) ON DELETE CASCADE 
 );
+
+ALTER TABLE userscrushes
+ADD CONSTRAINT unique_user_crush_pair UNIQUE (user_id, crush_id)
 
 CREATE TABLE IF NOT EXISTS UserActivity (
     id SERIAL PRIMARY KEY,
