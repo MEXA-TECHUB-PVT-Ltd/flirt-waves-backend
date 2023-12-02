@@ -20,6 +20,7 @@ CREATE TABLE IF NOT EXISTS Users (
   block_status BOOLEAN DEFAULT false, 
   height VARCHAR(255),
   location VARCHAR(255),
+  dob VARCHAR(255),
   gender VARCHAR(255),
   relation_type VARCHAR(255),
   cooking_skill VARCHAR(255),

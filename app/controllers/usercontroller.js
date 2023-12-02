@@ -344,7 +344,7 @@ const transporter = nodemailer.createTransport({
     },
 });
 
-const updatepassword = async (req, res) => {
+const resetpassword = async (req, res) => {
     const { email, password } = req.body;
 
     // Validate the new password
@@ -365,6 +365,35 @@ const updatepassword = async (req, res) => {
 
         // Update the user's password in the database
         const result = await pool.query('UPDATE Users SET password = $1 WHERE email = $2 RETURNING *', [hashedPassword, email]);
+
+        res.status(200).json({ error: false, msg: 'Password updated successfully', data: result.rows[0] });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+}
+
+const updatePassword = async (req, res) => {
+    const { userId, password } = req.body;
+
+    // Validate the new password
+    if (password.length < 6) {
+        return res.status(400).json({ error: true, msg: 'Password must be at least 6 characters long' });
+    }
+
+    try {
+        // Check if the user exists in the database
+        const userQueryResult = await pool.query('SELECT * FROM Users WHERE id = $1', [userId]);
+
+        if (userQueryResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'User with this ID not found' });
+        }
+
+        // Hash the new password
+        const hashedPassword = await bcrypt.hash(password, 10);
+
+        // Update the user's password in the database
+        const result = await pool.query('UPDATE Users SET password = $1 WHERE id = $2 RETURNING *', [hashedPassword, userId]);
 
         res.status(200).json({ error: false, msg: 'Password updated successfully', data: result.rows[0] });
     } catch (error) {
@@ -596,25 +625,37 @@ const getVerifiedUserById = async (req, res) => {
 
 const getDashboardprofiles = async (req, res) => {
     const { userId } = req.params;
-    const { country, genderId } = req.body;
+    const { country, genderId, dob } = req.body; // Assuming dob is provided in the format YYYY-MM-DD
 
     let query = 'SELECT * FROM Users WHERE id != $1 AND location = $2';
     const queryParams = [userId, country];
 
     if (genderId) {
-        query += ' AND gender = $3'; // Assuming 'gender' is a column in the Users table
+        query += ' AND gender = $3';
         queryParams.push(genderId);
     }
 
-    try {
-        const usersByCountryAndGender = await pool.query(query, queryParams);
+    if (dob) {
+        // Calculate date ranges for 5 years greater and 5 years less from the provided DOB
+        const lowerDate = new Date(dob);
+        lowerDate.setFullYear(lowerDate.getFullYear() - 5);
 
-        res.json({error:false,data:usersByCountryAndGender.rows});
+        const upperDate = new Date(dob);
+        upperDate.setFullYear(upperDate.getFullYear() + 5);
+
+        query += ' AND dob BETWEEN $4 AND $5';
+        queryParams.push(lowerDate.toISOString(), upperDate.toISOString());
+    }
+
+    try {
+        const usersByCountryAndGenderAndAge = await pool.query(query, queryParams);
+
+        res.json({ error: false, data: usersByCountryAndGenderAndAge.rows });
     } catch (error) {
         console.error('Error fetching users:', error);
-        res.status(500).json({ error:true,msg: 'Internal server error' });
+        res.status(500).json({ error: true, msg: 'Internal server error' });
     }
-}
+ }
 
 const getrecentprofiles = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
@@ -784,4 +825,4 @@ const getAllUsersWithBlockStatusTrue = async (req, res) => {
       }
    };
 //    getalldeletedusers
-module.exports = {getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, updatepassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName,getAllUsersWithBlockStatusTrue };
+module.exports = {getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, resetpassword,updatePassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName,getAllUsersWithBlockStatusTrue };
