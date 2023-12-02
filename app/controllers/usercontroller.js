@@ -434,7 +434,7 @@ const deleteuser = async (req, res) => {
     }
 }
 
- 
+
 
 const deleteuserpermanently = async (req, res) => {
     try {
@@ -505,10 +505,20 @@ const updateUserBlockStatus = async (req, res) => {
 
 const getUsersWithFilters = async (req, res) => {
 
+    const { id } = req.params;
     const { name } = req.body;
 
     try {
+        // Check if the user exists
+        const userQuery = 'SELECT id FROM Users WHERE id = $1';
+        const user = await pool.query(userQuery, [id]);
+
+        if (user.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'User not found.' });
+        }
+
         const query = `
+           
     SELECT 'Gender' as table_name, id, gender as matched_field FROM Gender WHERE gender ILIKE $1
     UNION ALL
     SELECT 'Relationship' as table_name, id, relation_type as matched_field FROM Relationship WHERE relation_type ILIKE $1
@@ -526,7 +536,7 @@ const getUsersWithFilters = async (req, res) => {
     SELECT 'Kids' as table_name, id, kids_opinion as matched_field FROM Kids WHERE kids_opinion ILIKE $1
     UNION ALL
     SELECT 'Smoking' as table_name, id, smoking_opinion as matched_field FROM Smoking WHERE smoking_opinion ILIKE $1
-  `;
+        `;
 
         const { rows } = await pool.query(query, [`%${name}%`]);
 
@@ -655,31 +665,31 @@ const getDashboardprofiles = async (req, res) => {
         console.error('Error fetching users:', error);
         res.status(500).json({ error: true, msg: 'Internal server error' });
     }
- }
+}
 
 const getrecentprofiles = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
-  
+
     try {
-      const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // Get the time 24 hours ago
-      const query = 'SELECT * FROM Users WHERE created_at >= $1 OFFSET $2 LIMIT $3';
-      const queryParams = [twentyFourHoursAgo, offset, limit];
-  
-      const usersLast24Hours = await pool.query(query, queryParams);
-  
-      const users = usersLast24Hours.rows;
-      const totalCount = users.length;
-  
-      return res.status(200).json({
-        msg: 'Users signed up in the last 24 hours fetched successfully',
-        error: false,
-        count: totalCount,
-        data: users,
-      });
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // Get the time 24 hours ago
+        const query = 'SELECT * FROM Users WHERE created_at >= $1 OFFSET $2 LIMIT $3';
+        const queryParams = [twentyFourHoursAgo, offset, limit];
+
+        const usersLast24Hours = await pool.query(query, queryParams);
+
+        const users = usersLast24Hours.rows;
+        const totalCount = users.length;
+
+        return res.status(200).json({
+            msg: 'Users signed up in the last 24 hours fetched successfully',
+            error: false,
+            count: totalCount,
+            data: users,
+        });
     } catch (error) {
-      console.error('Error fetching users signed up in the last 24 hours:', error);
-      return res.status(500).json({ msg: 'Internal server error', error: true });
+        console.error('Error fetching users signed up in the last 24 hours:', error);
+        return res.status(500).json({ msg: 'Internal server error', error: true });
     }
 }
 
@@ -738,9 +748,9 @@ const searchUserByName = async (req, res) => {
 const getAllUsersWithBlockStatusTrue = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const offset = (page - 1) * limit;
-  
+
     try {
-      let query = `
+        let query = `
         SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image, u.device_id,
                u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
                u.created_at, u.updated_at, u.last_active,
@@ -765,30 +775,30 @@ const getAllUsersWithBlockStatusTrue = async (req, res) => {
         LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
         WHERE u.block_status = true
       `;
-  
-      if (page && limit) {
-        query += `
+
+        if (page && limit) {
+            query += `
           OFFSET ${offset}
           LIMIT ${limit}
         `;
-      }
-  
-      const result = await pool.query(query);
-  
-      const users = result.rows;
-      return res.status(200).json({
-        msg: 'Users with block_status as true',
-        error: false,
-        count: users.length,
-        data: users,
-      });
-    } catch (error) {
-      console.error('Error fetching users:', error);
-      return res.status(500).json({ msg: 'Internal server error', error: true });
-    }
-  };
+        }
 
-  const getUsersByYearAndMonth = async (req, res) => {
+        const result = await pool.query(query);
+
+        const users = result.rows;
+        return res.status(200).json({
+            msg: 'Users with block_status as true',
+            error: false,
+            count: users.length,
+            data: users,
+        });
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        return res.status(500).json({ msg: 'Internal server error', error: true });
+    }
+};
+
+const getUsersByYearAndMonth = async (req, res) => {
     try {
         const query = `
           SELECT 
@@ -802,27 +812,27 @@ const getAllUsersWithBlockStatusTrue = async (req, res) => {
           ORDER BY 
             year ASC, month ASC;
         `;
-    
+
         const result = await pool.query(query);
-    
+
         const usersByYearAndMonth = result.rows.reduce((acc, row) => {
-          const { year, month, user_count } = row;
-          if (!acc[year]) {
-            acc[year] = [];
-          }
-          acc[year].push({ month, user_count });
-          return acc;
+            const { year, month, user_count } = row;
+            if (!acc[year]) {
+                acc[year] = [];
+            }
+            acc[year].push({ month, user_count });
+            return acc;
         }, {});
-    
+
         return res.status(200).json({
-          msg: 'User count by year and month fetched successfully',
-          error: false,
-          data: usersByYearAndMonth,
+            msg: 'User count by year and month fetched successfully',
+            error: false,
+            data: usersByYearAndMonth,
         });
-      } catch (error) {
+    } catch (error) {
         console.error('Error fetching user count by year and month:', error);
         return res.status(500).json({ msg: 'Internal server error', error: true });
-      }
-   };
+    }
+};
 //    getalldeletedusers
-module.exports = {getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, resetpassword,updatePassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName,getAllUsersWithBlockStatusTrue };
+module.exports = { getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, resetpassword, updatePassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName, getAllUsersWithBlockStatusTrue };
