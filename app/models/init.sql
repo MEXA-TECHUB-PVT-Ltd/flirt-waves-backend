@@ -20,6 +20,8 @@ CREATE TABLE IF NOT EXISTS Users (
   block_status BOOLEAN DEFAULT false, 
   height VARCHAR(255),
   location VARCHAR(255),
+  latitude DECIMAL(10, 8),
+  longitude DECIMAL(11, 8),
   dob VARCHAR(255),
   gender VARCHAR(255),
   interested_in VARCHAR(255),
@@ -35,8 +37,10 @@ CREATE TABLE IF NOT EXISTS Users (
   verified_status BOOLEAN DEFAULT false,
   report_status BOOLEAN DEFAULT false, 
   subscription_status BOOLEAN DEFAULT false, 
+  online_status BOOLEAN DEFAULT false, 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW(),
+  deleted_at timestamp DEFAULT NOW(),
   last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ); 
 

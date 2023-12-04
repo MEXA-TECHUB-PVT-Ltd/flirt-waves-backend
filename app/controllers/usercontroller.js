@@ -116,9 +116,9 @@ const usersignin = async (req, res) => {
 
         // Update device_id if provided during sign-in
         if (device_id && typeof device_id === 'string') {
-            await pool.query('UPDATE Users SET device_id = $1, last_active = CURRENT_TIMESTAMP WHERE email = $2', [device_id, email]);
+            await pool.query('UPDATE Users SET device_id = $1, last_active = CURRENT_TIMESTAMP, online_status = true WHERE email = $2', [device_id, email]);
         } else {
-            await pool.query('UPDATE Users SET last_active = CURRENT_TIMESTAMP WHERE email = $1', [email]);
+            await pool.query('UPDATE Users SET last_active = CURRENT_TIMESTAMP, online_status = true WHERE email = $1', [email]);
         }
 
         // Fetch updated user data after the device_id update
@@ -140,35 +140,36 @@ const getallusers = async (req, res) => {
 
     try {
         let query = `
-      SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-             u.deleted_status, u.block_status, u.height, u.location,u.gender, u.verified_status, u.report_status,
-             u.created_at, u.updated_at, u.last_active,
-             g.gender AS interested_in_data,
-             r.relation_type AS relation_type_data,
-             c.cooking_skill AS cooking_skill_data,
-             h.habit AS habit_data,
-             e.exercise AS exercise_data,
-             hb.hobby AS hobby_data,
-             s.smoking_opinion AS smoking_opinion_data,
-             k.kids_opinion AS kids_opinion_data,
-             n.night_life AS night_life_data
-      FROM Users u
-      LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-      LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-      LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-      LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-      LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-      LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-      LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-      LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-      LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-    `;
+            SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+                u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
+                u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
+                g.gender AS interested_in_data,
+                r.relation_type AS relation_type_data,
+                c.cooking_skill AS cooking_skill_data,
+                h.habit AS habit_data,
+                e.exercise AS exercise_data,
+                hb.hobby AS hobby_data,
+                s.smoking_opinion AS smoking_opinion_data,
+                k.kids_opinion AS kids_opinion_data,
+                n.night_life AS night_life_data
+            FROM Users u
+            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+            WHERE u.deleted_status = false  -- Fetch only users where deleted_status is false
+        `;
 
         if (page && limit) {
             query += `
-        OFFSET ${offset}
-        LIMIT ${limit}
-      `;
+                OFFSET ${offset}
+                LIMIT ${limit}
+            `;
         }
 
         const result = await pool.query(query);
@@ -192,8 +193,8 @@ const getalluserbyID = async (req, res) => {
     try {
         const query = `
         SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-        u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
-        u.created_at, u.updated_at, u.last_active,
+        u.deleted_status, u.block_status, u.height, u.location,u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
+        u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
         g.gender AS interested_in_data,
         r.relation_type AS relation_type_data,
         c.cooking_skill AS cooking_skill_data,
@@ -239,32 +240,98 @@ const updateuserprofile = async (req, res) => {
     try {
         const { userid } = req.params; // Get the user ID from the URL parameters
         const {
-            name, dob, location, height, gender, interested_in, relation_type,
-            cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life
+            name, dob, location, latitude, longitude, height, gender, interested_in, relation_type,
+            cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life, images
         } = req.body;
 
+        // Check if the user exists before performing the update
+        const userExists = await pool.query('SELECT * FROM Users WHERE id = $1', [userid]);
+
+        if (userExists.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'User not found' });
+        }
+
+        // Validation of provided IDs against respective tables
+        const isValidIds = await Promise.all([
+            pool.query('SELECT id FROM Gender WHERE id = $1', [interested_in]),
+            pool.query('SELECT id FROM Relationship WHERE id = $1', [relation_type]),
+            pool.query('SELECT id FROM Cookingskill WHERE id = $1', [cooking_skill]),
+            pool.query('SELECT id FROM Habits WHERE id = $1', [habit]),
+            pool.query('SELECT id FROM Exercise WHERE id = $1', [exercise]),
+            pool.query('SELECT id FROM Hobbies WHERE id = $1', [hobby]),
+            pool.query('SELECT id FROM Smoking WHERE id = $1', [smoking_opinion]),
+            pool.query('SELECT id FROM Kids WHERE id = $1', [kids_opinion]),
+            pool.query('SELECT id FROM Nightlife WHERE id = $1', [night_life]),
+        ]);
+
+        // Check if any of the provided IDs are invalid
+        if (isValidIds.some(result => result.rows.length === 0)) {
+            return res.status(400).json({ error: true, msg: "Invalid ID's provided" });
+        }
+
+        // Perform the user profile update
         const updatedUser = await pool.query(
             `UPDATE Users 
-           SET name = $1, dob = $2, location = $3, height = $4, gender = $5,
-               interested_in = $6, relation_type = $7, cooking_skill = $8, habit = $9,
-               hobby = $10, exercise = $11, smoking_opinion = $12, kids_opinion = $13,
-               night_life = $14, updated_at = NOW()
-           WHERE id = $15
-           RETURNING *`,
+            SET name = $1, 
+                dob = $2, 
+                location = $3, 
+                height = $4, 
+                gender = $5,
+                interested_in = $6, 
+                relation_type = $7, 
+                cooking_skill = $8, 
+                habit = $9,
+                hobby = $10, 
+                exercise = $11, 
+                smoking_opinion = $12, 
+                kids_opinion = $13,
+                night_life = $14,
+                images = $15,  -- Update the images field here
+                latitude = $16,
+                longitude = $17,
+                updated_at = NOW()
+            WHERE id = $18
+            RETURNING *`,
             [
                 name, dob, location, height, gender, interested_in, relation_type,
-                cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life, userid
+                cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion,
+                night_life, JSON.stringify(images), latitude, longitude, userid  // Pass 'images' as the 15th parameter
             ]
         );
 
-        if (updatedUser.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'User not found' });
-        }
+        // Fetch associated data based on the updated user profile
+        const query = `
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.dob, u.height, u.location, u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
+        u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
+        g.gender AS interested_in_data,
+        r.relation_type AS relation_type_data,
+        c.cooking_skill AS cooking_skill_data,
+        h.habit AS habit_data,
+        e.exercise AS exercise_data,
+        hb.hobby AS hobby_data,
+        s.smoking_opinion AS smoking_opinion_data,
+        k.kids_opinion AS kids_opinion_data,
+        n.night_life AS night_life_data
+        FROM Users u
+        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+        WHERE u.id = $1
+    `; // Your query for fetching associated data (as previously provided)
+
+        const userData = await pool.query(query, [userid]);
 
         res.json({
             msg: 'User profile updated successfully',
             error: false,
-            data: updatedUser.rows[0],
+            data: userData.rows[0], // Return the updated user profile with associated data
         });
     } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
@@ -393,28 +460,23 @@ const deleteuser = async (req, res) => {
             return res.status(404).json({ error: true, msg: 'User not found' });
         }
 
-        // Update the deleted_status to true for the user
-        const updateUser = await pool.query('UPDATE Users SET deleted_status = true WHERE id = $1', [id]);
+        // Update deleted_status to true and set deleted_at to current timestamp for the user (soft delete)
+        const updateUser = await pool.query('UPDATE Users SET deleted_status = true, deleted_at = NOW() WHERE id = $1', [id]);
 
         if (updateUser.rowCount === 0) {
             return res.status(500).json({ error: true, msg: 'Failed to delete user' });
         }
 
-        // Fetch the updated user data
-        const updatedUser = await pool.query('SELECT * FROM Users WHERE id = $1', [id]);
-
         res.status(200).json({
             error: false,
             msg: 'User deleted successfully',
-            data: updatedUser.rows[0]
+            data: updateUser.rows[0]
         });
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: true, msg: 'Internal server error' });
     }
 }
-
-
 
 const deleteuserpermanently = async (req, res) => {
     try {
@@ -675,31 +737,111 @@ const getrecentprofiles = async (req, res) => {
 
 const getCurrentlyOnlineUsers = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
-
-    // Calculate the OFFSET based on the page and limit
     const offset = (page - 1) * limit;
 
     try {
-        // Calculate the timestamp for 5 minutes ago
-        const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+        let query = `
+            SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+                u.deleted_status, u.block_status, u.height, u.location,u.gender, u.verified_status, u.report_status,
+                u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
+                g.gender AS interested_in_data,
+                r.relation_type AS relation_type_data,
+                c.cooking_skill AS cooking_skill_data,
+                h.habit AS habit_data,
+                e.exercise AS exercise_data,
+                hb.hobby AS hobby_data,
+                s.smoking_opinion AS smoking_opinion_data,
+                k.kids_opinion AS kids_opinion_data,
+                n.night_life AS night_life_data
+            FROM Users u
+            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+            WHERE u.deleted_status = false AND u.online_status = true -- Fetch only users where deleted_status is false and online_status is true
+        `;
 
-        // Fetch users who have been active within the last 5 minutes with pagination
-        const onlineUsers = await pool.query('SELECT * FROM Users WHERE last_active > $1 OFFSET $2 LIMIT $3', [
-            fiveMinutesAgo,
-            offset,
-            limit,
-        ]);
+        if (page && limit) {
+            query += `
+                OFFSET ${offset}
+                LIMIT ${limit}
+            `;
+        }
+
+        const result = await pool.query(query);
+
+        const users = result.rows;
+        return res.status(200).json({
+            msg: 'Online users fetched successfully',
+            error: false,
+            count: users.length,
+            data: users,
+        });
+    } catch (error) {
+        console.error('Error fetching users:', error);
+        return res.status(500).json({ msg: 'Internal server error', error: true });
+    }
+};
+
+const updateUserOnlineStatus = async (req, res) => {
+
+    const { id } = req.params;
+    const { online_status } = req.body;
+
+    try {
+        // Check if the user exists
+        const userExists = await pool.query('SELECT EXISTS(SELECT 1 FROM Users WHERE id = $1)', [id]);
+        if (!userExists.rows[0].exists) {
+            return res.status(404).json({ error: true, msg: 'User not found' });
+        }
+
+        // Update the online_status for the user
+        await pool.query('UPDATE Users SET online_status = $1 WHERE id = $2', [online_status, id]);
+
+        // Fetch updated user details
+        const query = `
+            SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+                u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
+                u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+                g.gender AS interested_in_data,
+                r.relation_type AS relation_type_data,
+                c.cooking_skill AS cooking_skill_data,
+                h.habit AS habit_data,
+                e.exercise AS exercise_data,
+                hb.hobby AS hobby_data,
+                s.smoking_opinion AS smoking_opinion_data,
+                k.kids_opinion AS kids_opinion_data,
+                n.night_life AS night_life_data
+            FROM Users u
+            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+            WHERE u.id = $1
+        `;
+
+        const updatedUser = await pool.query(query, [id]);
 
         res.status(200).json({
             error: false,
-            msg: 'Online users within the last 5 minutes with pagination',
-            count: onlineUsers.rows.length,
-            data: onlineUsers.rows,
+            msg: 'Online status updated successfully',
+            user: updatedUser.rows[0], // Sending the updated user details in the response
         });
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: true, msg: 'Internal server error' });
+        console.error('Error updating online status:', error);
+        res.status(500).json({ error: true, msg: 'Internal Server Error' });
     }
+
 };
 
 const searchUserByName = async (req, res) => {
@@ -733,7 +875,7 @@ const getAllUsersWithBlockStatusTrue = async (req, res) => {
         let query = `
         SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image, u.device_id,
                u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
-               u.created_at, u.updated_at, u.last_active,
+               u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
                g.gender AS gender_data,
                r.relation_type AS relation_type_data,
                c.cooking_skill AS cooking_skill_data,
@@ -814,5 +956,58 @@ const getUsersByYearAndMonth = async (req, res) => {
         return res.status(500).json({ msg: 'Internal server error', error: true });
     }
 };
-//    getalldeletedusers
-module.exports = { getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, resetpassword, updatePassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName, getAllUsersWithBlockStatusTrue };
+
+const getalldeletedusers = async (req, res) => {
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
+
+    try {
+        let query = `
+            SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+                u.deleted_status, u.block_status, u.height, u.location,u.gender, u.verified_status, u.report_status,
+                u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
+                g.gender AS interested_in_data,
+                r.relation_type AS relation_type_data,
+                c.cooking_skill AS cooking_skill_data,
+                h.habit AS habit_data,
+                e.exercise AS exercise_data,
+                hb.hobby AS hobby_data,
+                s.smoking_opinion AS smoking_opinion_data,
+                k.kids_opinion AS kids_opinion_data,
+                n.night_life AS night_life_data
+            FROM Users u
+            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+            WHERE u.deleted_status = true -- Fetch only users where deleted_status is true
+        `;
+
+        if (page && limit) {
+            query += `
+                OFFSET ${offset}
+                LIMIT ${limit}
+            `;
+        }
+
+        const result = await pool.query(query);
+
+        const users = result.rows;
+        return res.status(200).json({
+            msg: 'Deleted users fetched successfully',
+            error: false,
+            count: users.length,
+            data: users,
+        });
+    } catch (error) {
+        console.error('Error fetching deleted users:', error);
+        return res.status(500).json({ msg: 'Internal server error', error: true });
+    }
+}
+
+module.exports = { updateUserOnlineStatus, getalldeletedusers, getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, resetpassword, updatePassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName, getAllUsersWithBlockStatusTrue };

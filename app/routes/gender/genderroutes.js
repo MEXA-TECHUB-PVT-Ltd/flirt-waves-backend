@@ -6,6 +6,7 @@ router.post('/add_gender', genderController.creategender);
 router.put('/update_gender/:id', genderController.updateGender);
 router.delete('/delete_gender/:id', genderController.deleteGender);
 router.get('/getall_genders', genderController.getAllGenders); 
-router.post('/add_user_gender', genderController.addpreferncerToUser);   
+router.post('/add_user_gender', genderController.addpreferncerToUser);  
+router.post('/get_filter_gender/:user_id', genderController.filterGender);  
   
 module.exports = router;

@@ -77,6 +77,43 @@ const getFavoritesbyuserID = async (req, res) => {
     }
 };
 
+const getFavoriteById = async (req, res) => {
+    const { user_id } = req.params;
+    const { favorite_id } = req.body;
+
+    try {
+        // Check if the user exists
+        const userExists = await pool.query('SELECT EXISTS(SELECT 1 FROM Users WHERE id = $1)', [user_id]);
+        if (!userExists.rows[0].exists) {
+            return res.status(404).json({ error: true, msg: 'User not found' });
+        }
+
+        // Query to retrieve the specific favorite of the user
+        const favoriteQuery = `
+            SELECT Users.*
+            FROM Users
+            INNER JOIN Favorites ON Users.id = Favorites.favorite_user_id
+            WHERE Favorites.user_id = $1 AND Favorites.favorite_user_id = $2
+        `;
+
+        const favoriteResult = await pool.query(favoriteQuery, [user_id, favorite_id]);
+        const favorite = favoriteResult.rows;
+
+        if (favorite.length === 0) {
+            return res.status(404).json({ error: true, msg: 'Favorite not found for the user' });
+        }
+
+        res.status(200).json({
+            error: false,
+            msg: 'Favorite fetched successfully',
+            data: favorite,
+        });
+    } catch (error) {
+        console.error('Error fetching favorite:', error);
+        res.status(500).json({ error: true, msg: 'Internal Server Error' });
+    }
+}
+
 const getAllFavorites = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
 
@@ -139,4 +176,40 @@ const removeFavorite = async (req, res) => {
     }
 };
 
-module.exports = { addToFavorites, getFavoritesbyuserID, getAllFavorites, removeFavorite };
+const checkFavoriteStatus = async (req, res) => {
+    const { user_id, favorite_id } = req.body;
+// console.log(user_id,favorite_id);
+    if (!user_id || !favorite_id) {
+        return res.status(400).json({ error: true, msg: 'User ID and Favorite ID are required' });
+    }
+
+    const checkExistingQuery = `
+        SELECT * FROM Favorites
+        WHERE user_id = $1 AND favorite_user_id = $2
+    `;
+
+    pool.query(checkExistingQuery, [user_id, favorite_id], (err, result) => {
+        if (err) {
+            console.error('Error checking favorite status:', err);
+            return res.status(500).json({ saved_status: false, error: true });
+        }
+
+        if (result.rows.length > 0) {
+            // Favorite exists for the user
+            return res.status(200).json({
+                saved_status: true,
+                error: false,
+                message: 'Favorite found for the user',
+            });
+        } else {
+            return res.status(200).json({
+                saved_status: false,
+                error: false,
+                message: 'Favorite not found for the user',
+            });
+        }
+    });
+
+}
+
+module.exports = { checkFavoriteStatus, getFavoriteById, addToFavorites, getFavoritesbyuserID, getAllFavorites, removeFavorite };

@@ -167,4 +167,65 @@ const getusersofsmokingopinion = async (req, res) => {
     }
 };
 
-module.exports = { addsmokingopinion, updateSmokingopinion, deleteSmokingopinion, getAllSmokingopinions, getSmokingopinionByID, getusersofsmokingopinion };
+const filterSmokingOpinion = async (req, res) => {
+    const { user_id } = req.params;
+    const { smoking_opinion_id } = req.body;
+
+    try {
+        // Check if the user exists
+        const userQuery = `
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.height, u.location,u.latitude, u.longitude,u.gender, u.verified_status, u.report_status,
+        u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
+        g.gender AS interested_in_data,
+        r.relation_type AS relation_type_data,
+        c.cooking_skill AS cooking_skill_data,
+        h.habit AS habit_data,
+        e.exercise AS exercise_data,
+        hb.hobby AS hobby_data,
+        s.smoking_opinion AS smoking_opinion_data,
+        k.kids_opinion AS kids_opinion_data,
+        n.night_life AS night_life_data
+    FROM Users u
+    LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+    LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+    LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+    LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+    LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+    LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+    LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+    LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+    LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+    WHERE u.id = $1 AND u.deleted_status = false
+        `;
+
+        const userResult = await pool.query(userQuery, [user_id]);
+
+        if (userResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'User not found' });
+        }
+
+        // Check if the smoking opinion exists
+        const smokingOpinionQuery = 'SELECT * FROM Smoking WHERE id = $1';
+        const smokingOpinionResult = await pool.query(smokingOpinionQuery, [smoking_opinion_id]);
+
+        if (smokingOpinionResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'Smoking opinion not found' });
+        }
+
+        // Both user and smoking opinion exist, return details
+        const userData = userResult.rows[0];
+        const smokingOpinionData = smokingOpinionResult.rows[0];
+
+        res.status(200).json({
+            error: false,
+            msg: 'User and Smoking opinion details fetched successfully',
+            user: userData,
+            smoking_opinion: smokingOpinionData,
+        });
+    } catch (error) {
+        res.status(500).json({ error: true, msg: error.message });
+    }
+};
+
+module.exports = { filterSmokingOpinion, addsmokingopinion, updateSmokingopinion, deleteSmokingopinion, getAllSmokingopinions, getSmokingopinionByID, getusersofsmokingopinion };
