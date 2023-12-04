@@ -140,10 +140,10 @@ const getallusers = async (req, res) => {
 
     try {
         let query = `
-      SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image, u.device_id,
-             u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
+      SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+             u.deleted_status, u.block_status, u.height, u.location,u.gender, u.verified_status, u.report_status,
              u.created_at, u.updated_at, u.last_active,
-             g.gender AS gender_data,
+             g.gender AS interested_in_data,
              r.relation_type AS relation_type_data,
              c.cooking_skill AS cooking_skill_data,
              h.habit AS habit_data,
@@ -153,7 +153,7 @@ const getallusers = async (req, res) => {
              k.kids_opinion AS kids_opinion_data,
              n.night_life AS night_life_data
       FROM Users u
-      LEFT JOIN Gender g ON u.gender::varchar = g.id::varchar
+      LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
       LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
       LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
       LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
@@ -191,29 +191,29 @@ const getalluserbyID = async (req, res) => {
 
     try {
         const query = `
-        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image, u.device_id,
-               u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
-               u.created_at, u.updated_at, u.last_active,
-               g.gender AS gender_data,
-               r.relation_type AS relation_type_data,
-               c.cooking_skill AS cooking_skill_data,
-               h.habit AS habit_data,
-               e.exercise AS exercise_data,
-               hb.hobby AS hobby_data,
-               s.smoking_opinion AS smoking_opinion_data,
-               k.kids_opinion AS kids_opinion_data,
-               n.night_life AS night_life_data
-        FROM Users u
-        LEFT JOIN Gender g ON u.gender::varchar = g.id::varchar
-        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-        WHERE u.id = $1
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
+        u.created_at, u.updated_at, u.last_active,
+        g.gender AS interested_in_data,
+        r.relation_type AS relation_type_data,
+        c.cooking_skill AS cooking_skill_data,
+        h.habit AS habit_data,
+        e.exercise AS exercise_data,
+        hb.hobby AS hobby_data,
+        s.smoking_opinion AS smoking_opinion_data,
+        k.kids_opinion AS kids_opinion_data,
+        n.night_life AS night_life_data
+ FROM Users u
+ LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+ LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+ LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+ LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+ LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+ LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+ LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+ LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+ LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+ WHERE u.id = $1
       `;
 
         const result = await pool.query(query, [userId]);
@@ -235,61 +235,41 @@ const getalluserbyID = async (req, res) => {
 }
 
 const updateuserprofile = async (req, res) => {
-    const { id } = req.params; // Assuming the user ID is passed as a parameter
-    const updateData = req.body;
 
     try {
-        // Check if the user with the provided ID exists in your database
-        const userData = await pool.query('SELECT * FROM Users WHERE id = $1', [id]);
+        const { userid } = req.params; // Get the user ID from the URL parameters
+        const {
+            name, dob, location, height, gender, interested_in, relation_type,
+            cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life
+        } = req.body;
 
-        if (userData.rows.length === 0) {
+        const updatedUser = await pool.query(
+            `UPDATE Users 
+           SET name = $1, dob = $2, location = $3, height = $4, gender = $5,
+               interested_in = $6, relation_type = $7, cooking_skill = $8, habit = $9,
+               hobby = $10, exercise = $11, smoking_opinion = $12, kids_opinion = $13,
+               night_life = $14, updated_at = NOW()
+           WHERE id = $15
+           RETURNING *`,
+            [
+                name, dob, location, height, gender, interested_in, relation_type,
+                cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life, userid
+            ]
+        );
+
+        if (updatedUser.rows.length === 0) {
             return res.status(404).json({ error: true, msg: 'User not found' });
         }
 
-        const existingUser = userData.rows[0];
-
-        // Remove email and non-existing attributes from updateData
-        delete updateData.email;
-        Object.keys(updateData).forEach(key => {
-            if (!existingUser.hasOwnProperty(key)) {
-                delete updateData[key];
-            }
+        res.json({
+            msg: 'User profile updated successfully',
+            error: false,
+            data: updatedUser.rows[0],
         });
-
-        const updateValues = [];
-        const updateColumns = [];
-
-        // Build the update query based on provided attributes
-        Object.keys(updateData).forEach((key, index) => {
-            updateColumns.push(`${key} = $${index + 1}`);
-            updateValues.push(updateData[key]);
-        });
-
-        if (updateValues.length > 0) {
-            updateValues.push(id);
-
-            let updateQuery = `UPDATE Users SET ${updateColumns.join(', ')} WHERE id = $${updateValues.length} RETURNING *`;
-
-            // Perform the update operation
-            const updatedUser = await pool.query(updateQuery, updateValues);
-
-            if (updatedUser.rows.length === 0) {
-                return res.status(500).json({ error: true, msg: 'Failed to update user profile' });
-            }
-
-            res.status(200).json({
-                error: false,
-                msg: 'User profile updated successfully',
-                data: updatedUser.rows[0]
-            });
-        } else {
-            // No attributes provided to update or non-existing attributes provided
-            res.status(200).json({ error: false, msg: 'No changes made', data: existingUser });
-        }
     } catch (error) {
-        console.error(error);
-        res.status(500).json({ error: true, msg: 'Internal server error' });
+        res.status(500).json({ error: true, msg: error.message });
     }
+
 };
 
 const forgetpassword = async (req, res) => {

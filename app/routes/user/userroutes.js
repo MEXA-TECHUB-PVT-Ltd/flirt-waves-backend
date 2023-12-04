@@ -6,7 +6,7 @@ router.post('/user_signup', userController.usersignup);
 router.post('/user_signin', userController.usersignin);
 router.get('/get_all_users', userController.getallusers);
 router.get('/get_user_by_ID/:id', userController.getalluserbyID);
-router.put('/update_userprofile/:id', userController.updateuserprofile);
+router.put('/update_userprofile/:userid', userController.updateuserprofile);
 router.post('/forget_password', userController.forgetpassword);
 router.put('/reset_password', userController.resetpassword);
 router.put('/update_password', userController.updatePassword); 
