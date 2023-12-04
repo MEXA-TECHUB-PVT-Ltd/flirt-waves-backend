@@ -19,22 +19,34 @@ const createRelationship = async (req, res) => {
 
 const updateRelationship = async (req, res) => {
   try {
-    const { id } = req.params; // Get the ID from the URL parameters
-    const { relation_type } = req.body;
+    const { userid } = req.params; // Get the user ID from the URL parameters
+    const {
+      name, dob, location, height, gender, interested_in, relation_type,
+      cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life
+    } = req.body;
 
-    const updatedRelationship = await pool.query(
-      'UPDATE relationship SET relation_type = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-      [relation_type, id]
+    const updatedUser = await pool.query(
+      `UPDATE Users 
+       SET name = $1, dob = $2, location = $3, height = $4, gender = $5,
+           interested_in = $6, relation_type = $7, cooking_skill = $8, habit = $9,
+           hobby = $10, exercise = $11, smoking_opinion = $12, kids_opinion = $13,
+           night_life = $14, updated_at = NOW()
+       WHERE id = $15
+       RETURNING *`,
+      [
+        name, dob, location, height, gender, interested_in, relation_type,
+        cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life, userid
+      ]
     );
 
-    if (updatedRelationship.rows.length === 0) {
-      return res.status(404).json({ error: true, msg: 'Relationship not found' });
+    if (updatedUser.rows.length === 0) {
+      return res.status(404).json({ error: true, msg: 'User not found or no changes applied' });
     }
 
     res.json({
-      msg: 'Relationship updated successfully',
+      msg: 'User profile updated successfully',
       error: false,
-      data: updatedRelationship.rows[0],
+      data: updatedUser.rows[0],
     });
   } catch (error) {
     res.status(500).json({ error: true, msg: error.message });
