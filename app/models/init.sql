@@ -1,11 +1,11 @@
--- CREATE TABLE IF NOT EXISTS Admin (
---   id BIGSERIAL PRIMARY KEY, 
---   name text,
---   email text,
---   password text,
---   created_at timestamp DEFAULT NOW(),
---   updated_at timestamp DEFAULT NOW()
--- ); 
+CREATE TABLE IF NOT EXISTS Admin (
+  id SERIAL PRIMARY KEY, 
+  name text,
+  email text,
+  password text,
+  created_at timestamp DEFAULT NOW(),
+  updated_at timestamp DEFAULT NOW()
+); 
 
 CREATE TABLE IF NOT EXISTS Users (
   id SERIAL PRIMARY KEY,
@@ -17,7 +17,10 @@ CREATE TABLE IF NOT EXISTS Users (
   image VARCHAR(255),
   device_id VARCHAR(255),
   deleted_status BOOLEAN DEFAULT false,  
-  block_status BOOLEAN DEFAULT false,  
+  block_status BOOLEAN DEFAULT false, 
+  height VARCHAR(255),
+  location VARCHAR(255),
+  dob VARCHAR(255),
   gender VARCHAR(255),
   relation_type VARCHAR(255),
   cooking_skill VARCHAR(255),
@@ -129,9 +132,10 @@ CREATE TABLE IF NOT EXISTS UserRelationships (
 
 CREATE TABLE IF NOT EXISTS ReportUsers (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER NOT NULL,
+  user_id INTEGER NOT NULL REFERENCES Users(id), 
   reason VARCHAR(255), 
   description VARCHAR(255), 
+  reporter_id INTEGER REFERENCES Users(id),
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
 ); 
@@ -153,3 +157,19 @@ CREATE TABLE IF NOT EXISTS Favorites (
   FOREIGN KEY (user_id) REFERENCES Users(id),
   FOREIGN KEY (favorite_user_id) REFERENCES Users(id)
 );
+
+CREATE TABLE IF NOT EXISTS Faqs (
+  id SERIAL PRIMARY KEY,
+  question VARCHAR(255), 
+  answer VARCHAR(255), 
+  created_at timestamp DEFAULT NOW(),
+  updated_at timestamp DEFAULT NOW()
+); 
+
+CREATE TABLE IF NOT EXISTS Feedback (
+ id SERIAL PRIMARY KEY,
+ user_id INTEGER REFERENCES Users(id),
+ feedback_description VARCHAR(255),
+ created_at TIMESTAMP DEFAULT NOW(),
+ updated_at TIMESTAMP DEFAULT NOW()
+); 
