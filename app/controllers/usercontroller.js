@@ -545,6 +545,76 @@ const updateUserBlockStatus = async (req, res) => {
     }
 };
 
+const blockUser = async (req, res) => {
+    // const { userId } = req.params; // ID of the user performing the block action
+    // const { blockuserId } = req.body; // ID of the user to be blocked
+
+    const { userId } = req.params; // ID of the user performing the block action
+    const { blockuserId } = req.body; // ID of the user to be blocked
+
+    try {
+        // Check if the blocker user exists
+        const blockerUserQuery = 'SELECT * FROM Users WHERE id = $1';
+        const blockerUserResult = await pool.query(blockerUserQuery, [userId]);
+
+        if (blockerUserResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'User not found' });
+        }
+
+        // Check if the user to be blocked exists
+        const userToBlockQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userToBlockResult = await pool.query(userToBlockQuery, [blockuserId]);
+
+        if (userToBlockResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'User to block not found' });
+        }
+
+        // Update block_status for the user to be blocked
+        const updateBlockStatusQuery = 'UPDATE Users SET block_status = $1 WHERE id = $2';
+        await pool.query(updateBlockStatusQuery, [true, blockuserId]);
+
+        // Get details of the blocked user along with additional information
+        const userDetailsQuery = `
+            SELECT 
+                u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+                u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
+                u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+                g.gender AS interested_in_data,
+                r.relation_type AS relation_type_data,
+                c.cooking_skill AS cooking_skill_data,
+                h.habit AS habit_data,
+                e.exercise AS exercise_data,
+                hb.hobby AS hobby_data,
+                s.smoking_opinion AS smoking_opinion_data,
+                k.kids_opinion AS kids_opinion_data,
+                n.night_life AS night_life_data
+            FROM Users u
+            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+            WHERE u.id = $1 AND u.deleted_status = false
+        `;
+        
+        const userDetailsResult = await pool.query(userDetailsQuery, [blockuserId]);
+        const blockedUserDetails = userDetailsResult.rows[0];
+
+        return res.status(200).json({
+            message: 'User blocked successfully',
+            error: false,
+            blockedUserDetails,
+        });
+    } catch (error) {
+        console.error('Error blocking user:', error);
+        return res.status(500).json({ error: true, msg: 'Internal server error' });
+    }
+};
+
 const getUsersWithFilters = async (req, res) => {
 
     const { id } = req.params;
@@ -619,22 +689,39 @@ const updateUserVerifiedStatus = async (req, res) => {
 
 const getVerifiedUsers = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
+    const { userId } = req.params;
 
     try {
+        // Check if the userId exists in the Users table
+        const userExistsQuery = `
+            SELECT COUNT(*) AS userCount
+            FROM Users
+            WHERE id = $1
+        `;
+
+        const userExistsResult = await pool.query(userExistsQuery, [userId]);
+        const userCount = parseInt(userExistsResult.rows[0].userCount);
+
+        if (userCount === 0) {
+            // If the user does not exist, return a 404 Not Found response
+            return res.status(404).json({ error: true, msg: 'User not found' });
+        }
+
         // Calculate the OFFSET based on the page and limit
         const offset = (page - 1) * limit;
 
-        // Query to retrieve verified users with pagination
+        // Query to retrieve verified users with pagination, excluding a specific user
         const verifiedUsersQuery = `
-        SELECT *, COUNT(*) OVER() AS total_count
-        FROM Users
-        WHERE verified_status = true
-        ORDER BY id
-        OFFSET $1
-        LIMIT $2
-      `;
+            SELECT *, COUNT(*) OVER() AS total_count
+            FROM Users
+            WHERE verified_status = true
+            AND id <> $1 -- Exclude specific user
+            ORDER BY id
+            OFFSET $2
+            LIMIT $3
+        `;
 
-        const verifiedUsersResult = await pool.query(verifiedUsersQuery, [offset, limit]);
+        const verifiedUsersResult = await pool.query(verifiedUsersQuery, [userId, offset, limit]);
         const verifiedUsers = verifiedUsersResult.rows;
 
         // Extract the total count from the first row of the result
@@ -676,47 +763,97 @@ const getVerifiedUserById = async (req, res) => {
 };
 
 const getDashboardprofiles = async (req, res) => {
-    const { userId } = req.params;
-    const { country, genderId, dob } = req.body; // Assuming dob is provided in the format YYYY-MM-DD
-
-    let query = 'SELECT * FROM Users WHERE id != $1 AND location = $2';
-    const queryParams = [userId, country];
-
-    if (genderId) {
-        query += ' AND gender = $3';
-        queryParams.push(genderId);
-    }
-
-    if (dob) {
-        // Calculate date ranges for 5 years greater and 5 years less from the provided DOB
-        const lowerDate = new Date(dob);
-        lowerDate.setFullYear(lowerDate.getFullYear() - 5);
-
-        const upperDate = new Date(dob);
-        upperDate.setFullYear(upperDate.getFullYear() + 5);
-
-        query += ' AND dob BETWEEN $4 AND $5';
-        queryParams.push(lowerDate.toISOString(), upperDate.toISOString());
-    }
+    const { page = 1, limit = 10 } = req.query;
+    const offset = (page - 1) * limit;
 
     try {
-        const usersByCountryAndGenderAndAge = await pool.query(query, queryParams);
+        const userId = req.params.userId; // User ID provided in route params
 
-        res.json({ error: false, data: usersByCountryAndGenderAndAge.rows });
+        if (!userId) {
+            return res.status(400).json({ error: true, msg: 'User ID is missing in the parameters' });
+        }
+
+        // Fetch the user's date of birth and interested_in field
+        const userResult = await pool.query('SELECT dob, interested_in FROM users WHERE id = $1', [userId]);
+
+        if (userResult.rows.length > 0) {
+            const userDOB = userResult.rows[0].dob;
+            const interested_in = userResult.rows[0].interested_in;
+
+            if (userDOB) {
+                // Calculate age difference (+5 years or -5 years) from the user's date of birth
+                const queryDatePlus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() + 5));
+                const queryDateMinus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() - 5));
+
+                // Query to fetch similar users based on interests and age difference, excluding the provided user's ID
+                let similarUsersQuery = `
+            SELECT u.id, u.name, u.email, u.signup_type, u.images, u.device_id,
+              u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
+              u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+              g.gender AS interested_in_data,
+              r.relation_type AS relation_type_data,
+              c.cooking_skill AS cooking_skill_data,
+              h.habit AS habit_data,
+              e.exercise AS exercise_data,
+              hb.hobby AS hobby_data,
+              s.smoking_opinion AS smoking_opinion_data,
+              k.kids_opinion AS kids_opinion_data,
+              n.night_life AS night_life_data
+            FROM Users u
+            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+            WHERE u.deleted_status = false
+            AND u.id != $1
+            AND u.interested_in = $2
+            AND u.dob BETWEEN $3 AND $4
+            OFFSET ${offset}
+            LIMIT ${limit}
+          `;
+
+                const { rows: data } = await pool.query(similarUsersQuery, [userId, interested_in, queryDateMinus5Years, queryDatePlus5Years]);
+
+                res.status(200).json({
+                    msg: "users fetched",
+                    error: false,
+                    count: data.length,
+                    data,
+                });
+            } else {
+                res.status(404).json({ error: true, msg: 'User date of birth is missing' });
+            }
+        } else {
+            res.status(404).json({ error: true, msg: 'User not found' });
+        }
     } catch (error) {
-        console.error('Error fetching users:', error);
-        res.status(500).json({ error: true, msg: 'Internal server error' });
+        res.status(500).json({ error: error.message });
     }
 }
 
 const getrecentprofiles = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
+    const { userId } = req.params; // Assuming the user ID is provided in the params
     const offset = (page - 1) * limit;
 
     try {
         const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // Get the time 24 hours ago
-        const query = 'SELECT * FROM Users WHERE created_at >= $1 OFFSET $2 LIMIT $3';
-        const queryParams = [twentyFourHoursAgo, offset, limit];
+
+        // Check if the provided userId exists in the Users table
+        const userCheckQuery = 'SELECT id FROM Users WHERE id = $1';
+        const userCheckResult = await pool.query(userCheckQuery, [userId]);
+
+        if (userId && userCheckResult.rows.length === 0) {
+            return res.status(404).json({ msg: 'User not found', error: true });
+        }
+
+        const query = 'SELECT * FROM Users WHERE created_at >= $1 AND id != $2 OFFSET $3 LIMIT $4';
+        const queryParams = [twentyFourHoursAgo, userId, offset, limit];
 
         const usersLast24Hours = await pool.query(query, queryParams);
 
@@ -737,13 +874,23 @@ const getrecentprofiles = async (req, res) => {
 
 const getCurrentlyOnlineUsers = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
+    const { userId } = req.params; // Assuming the user ID is provided in the params
+
     const offset = (page - 1) * limit;
 
     try {
+        // Check if the provided userId exists in the Users table
+        const userCheckQuery = `SELECT id FROM Users WHERE id = '${userId}'`;
+        const userCheckResult = await pool.query(userCheckQuery);
+
+        if (userCheckResult.rows.length === 0) {
+            return res.status(404).json({ msg: 'User not found', error: true });
+        }
+
         let query = `
             SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-                u.deleted_status, u.block_status, u.height, u.location,u.gender, u.verified_status, u.report_status,
-                u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
+                u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
+                u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
                 g.gender AS interested_in_data,
                 r.relation_type AS relation_type_data,
                 c.cooking_skill AS cooking_skill_data,
@@ -763,8 +910,11 @@ const getCurrentlyOnlineUsers = async (req, res) => {
             LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
             LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
             LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-            WHERE u.deleted_status = false AND u.online_status = true -- Fetch only users where deleted_status is false and online_status is true
-        `;
+            WHERE u.deleted_status = false AND u.online_status = true`;
+
+        if (userId) {
+            query += ` AND u.id != '${userId}'`;
+        }
 
         if (page && limit) {
             query += `
@@ -1010,4 +1160,4 @@ const getalldeletedusers = async (req, res) => {
     }
 }
 
-module.exports = { updateUserOnlineStatus, getalldeletedusers, getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, resetpassword, updatePassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName, getAllUsersWithBlockStatusTrue };
+module.exports = { updateUserOnlineStatus, getalldeletedusers, getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, resetpassword, updatePassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName, getAllUsersWithBlockStatusTrue, blockUser };
