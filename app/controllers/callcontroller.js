@@ -1,221 +1,11 @@
 const pool = require("../config/dbconfig")
 
-const createcall = async (req, res) => {
-
+const getUserDetailsById = async (userId) => {
     try {
-        const { callerId, receiverId, callStatus, callDuration, callType } = req.body;
-
-        // Check if callStatus and callType are valid
-        if (!['INCOMING', 'OUTGOING'].includes(callStatus) || !['AUDIO', 'VIDEO'].includes(callType)) {
-            return res.status(400).json({ error: 'Invalid callStatus or callType' });
-        }
-
-        // Check if callerId exists in the users table
-        const callerExistsQuery = `
-          SELECT COUNT(*) FROM users WHERE id = $1;
-        `;
-
-        const callerExistsResult = await pool.query(callerExistsQuery, [callerId]);
-        const callerExists = callerExistsResult.rows[0].count;
-
-        if (callerExists !== '1') {
-            return res.status(400).json({ msg: 'CallerId does not exist', error: true });
-        }
-
-        // Check if receiverId exists in the users table
-        const receiverExistsQuery = `
-          SELECT COUNT(*) FROM users WHERE id = $1;
-        `;
-
-        const receiverExistsResult = await pool.query(receiverExistsQuery, [receiverId]);
-        const receiverExists = receiverExistsResult.rows[0].count;
-
-        if (receiverExists !== '1') {
-            return res.status(400).json({ msg: 'ReceiverId does not exist', error: true });
-        }
-
-        // Insert into the calls table
-        const insertQuery = `
-          INSERT INTO calls (caller_id, receiver_id, call_status, call_duration_minutes, call_type)
-          VALUES ($1, $2, $3, $4, $5)
-          RETURNING *;`;
-
-        const values = [callerId, receiverId, callStatus, callDuration, callType];
-
-        const result = await pool.query(insertQuery, values);
-
-        res.json({ msg: 'Call created successfully', error: false, data: result.rows[0] });
-    } catch (error) {
-        console.error('Error creating call:', error);
-        res.status(500).json({ msg: 'Error creating call', error: true });
-    }
-
-}
-
-const getCallsByCallerId = async (req, res) => {
-    const { callerId } = req.params;
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
-
-    try {
-        const callerExistsQuery = `
-            SELECT COUNT(*) FROM users WHERE id = $1;
-        `;
-
-        const callerExistsResult = await pool.query(callerExistsQuery, [callerId]);
-        const callerExists = callerExistsResult.rows[0].count;
-
-        if (callerExists !== '1') {
-            return res.status(400).json({ msg: 'CallerId does not exist', error: true });
-        }
-
-        const getCallsQuery = `
-            SELECT 
-                c.*,
-                u.id AS user_id
-            FROM calls c
-            INNER JOIN users u ON c.caller_id = u.id
-            WHERE c.caller_id = $1
-            OFFSET $2
-            LIMIT $3;
-        `;
-
-        const callsResult = await pool.query(getCallsQuery, [callerId, offset, limit]);
-        const calls = callsResult.rows;
-
-        if (calls.length === 0) {
-            return res.json({
-                msg: 'No calls found for the callerId',
-                error: false,
-                data: [],
-            });
-        }
-
         const userQuery = `
-        SELECT 
-            u.id, 
-            u.name, 
-            u.email, 
-            u.password, 
-            u.token, 
-            u.signup_type, 
-            u.images, 
-            u.device_id,
-            u.deleted_status,
-            u.block_status,
-            u.height,
-            u.location,
-            u.latitude,
-            u.longitude,
-            u.gender,
-            u.verified_status,
-            u.report_status,
-            u.online_status,
-            u.subscription_status,
-            u.created_at,
-            u.updated_at,
-            u.deleted_at,
-            g.gender AS interested_in_data,
-            r.relation_type AS relation_type_data,
-            c.cooking_skill AS cooking_skill_data,
-            h.habit AS habit_data,
-            e.exercise AS exercise_data,
-            hb.hobby AS hobby_data,
-            s.smoking_opinion AS smoking_opinion_data,
-            k.kids_opinion AS kids_opinion_data,
-            n.night_life AS night_life_data
-        FROM users u
-        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-        WHERE u.id = $1
-        AND u.deleted_status = false;
-    `;
-
-        const userResult = await pool.query(userQuery, [callerId]);
-        const user = userResult.rows[0];
-
-        res.json({
-            msg: 'Data fetched successfully',
-            error: false,
-            count: calls.length,
-            data: {
-                user: user ? user : null,
-                calls: calls,
-            },
-        });
-    } catch (error) {
-        console.error('Error fetching data:', error);
-        res.status(500).json({ msg: 'Error fetching data', error: true });
-    }
-}
-
-const getCallByCallId = async (req, res) => {
-    const { callerId, callId } = req.params;
-
-    try {
-        const callerExistsQuery = `
-            SELECT COUNT(*) FROM users WHERE id = $1;
-        `;
-
-        const callerExistsResult = await pool.query(callerExistsQuery, [callerId]);
-        const callerExists = callerExistsResult.rows[0].count;
-
-        if (callerExists !== '1') {
-            return res.status(400).json({ msg: 'CallerId does not exist', error: true });
-        }
-
-        const getCallQuery = `
-            SELECT 
-                c.*,
-                u.id AS user_id
-            FROM calls c
-            INNER JOIN users u ON c.caller_id = u.id
-            WHERE c.caller_id = $1 AND c.call_id = $2;
-        `;
-
-        const callResult = await pool.query(getCallQuery, [callerId, callId]);
-        const call = callResult.rows[0];
-
-        if (!call) {
-            return res.json({
-                msg: 'No call found for the provided CallerId and CallId',
-                error: false,
-                data: null,
-            });
-        }
-
-        // Fetch user details associated with the callerId
-        const userQuery = `
-        SELECT 
-        u.id, 
-        u.name, 
-        u.email, 
-        u.password, 
-        u.token, 
-        u.signup_type, 
-        u.images, 
-        u.device_id,
-        u.deleted_status,
-        u.block_status,
-        u.height,
-        u.location,
-        u.latitude,
-        u.longitude,
-        u.gender,
-        u.verified_status,
-        u.report_status,
-        u.online_status,
-        u.subscription_status,
-        u.created_at,
-        u.updated_at,
-        u.deleted_at,
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.height, u.location, u.gender, u.dob,u.latitude,u.longitude, u.verified_status, u.report_status,
+        u.created_at, u.updated_at, u.last_active,
         g.gender AS interested_in_data,
         r.relation_type AS relation_type_data,
         c.cooking_skill AS cooking_skill_data,
@@ -225,69 +15,270 @@ const getCallByCallId = async (req, res) => {
         s.smoking_opinion AS smoking_opinion_data,
         k.kids_opinion AS kids_opinion_data,
         n.night_life AS night_life_data
-    FROM users u
-    LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-    LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-    LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-    LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-    LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-    LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-    LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-    LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-    LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-    WHERE u.id = $1
-    AND u.deleted_status = false;
+        FROM Users u
+        LEFT JOIN Gender g ON CAST(u.interested_in AS INTEGER) = g.id
+        LEFT JOIN Relationship r ON CAST(u.relation_type AS INTEGER) = r.id
+        LEFT JOIN Cookingskill c ON CAST(u.cooking_skill AS INTEGER) = c.id
+        LEFT JOIN Habits h ON CAST(u.habit AS INTEGER) = h.id
+        LEFT JOIN Exercise e ON CAST(u.exercise AS INTEGER) = e.id
+        LEFT JOIN Hobbies hb ON CAST(u.hobby AS INTEGER) = hb.id
+        LEFT JOIN Smoking s ON CAST(u.smoking_opinion AS INTEGER) = s.id
+        LEFT JOIN Kids k ON CAST(u.kids_opinion AS INTEGER) = k.id
+        LEFT JOIN Nightlife n ON CAST(u.night_life AS INTEGER) = n.id
+        WHERE u.id = $1;
+      `;
+
+        const userResult = await pool.query(userQuery, [userId]);
+        return userResult.rows[0]; // Return user details
+    } catch (error) {
+        throw new Error(`Error fetching user details: ${error.message}`);
+    }
+};
+
+const createcall = async (req, res) => {
+
+    try {
+        const { caller_id, receiver_id, channel_name, call_type } = req.body;
+
+        // Check if caller_id exists in the users table
+        const callerCheckQuery = `
+          SELECT id FROM users WHERE id = $1;
         `;
 
-        const userResult = await pool.query(userQuery, [callerId]);
-        const user = userResult.rows[0];
+        const callerCheckResult = await pool.query(callerCheckQuery, [caller_id]);
+
+        if (callerCheckResult.rows.length !== 1) {
+            return res.status(400).json({ msg: 'Caller does not exist', error: true });
+        }
+
+        // Check if receiver_id exists in the users table
+        const receiverCheckQuery = `
+          SELECT id FROM users WHERE id = $1;
+        `;
+
+        const receiverCheckResult = await pool.query(receiverCheckQuery, [receiver_id]);
+
+        if (receiverCheckResult.rows.length !== 1) {
+            return res.status(400).json({ msg: 'Receiver does not exist', error: true });
+        }
+
+        // Check if the call_type is AUDIO or VIDEO
+        const validCallTypes = ['AUDIO', 'VIDEO'];
+        if (!validCallTypes.includes(call_type.toUpperCase())) {
+            return res.status(400).json({ msg: 'Invalid call type. It must be AUDIO or VIDEO', error: true });
+        }
+
+        // Check if the channel_name is unique
+        const channelNameCheckQuery = `
+          SELECT channel_name FROM calls WHERE channel_name = $1;
+        `;
+
+        const channelNameCheckResult = await pool.query(channelNameCheckQuery, [channel_name]);
+
+        if (channelNameCheckResult.rows.length !== 0) {
+            return res.status(400).json({ msg: 'Channel name must be unique', error: true });
+        }
+
+        const query = `
+      INSERT INTO calls (caller_id, receiver_id, channel_name, call_type)
+      VALUES ($1, $2, $3, $4)
+      RETURNING *;
+    `;
+
+        const values = [caller_id, receiver_id, channel_name, call_type.toUpperCase()]; // Ensure call_type is uppercase
+
+        const result = await pool.query(query, values);
+
+        // Fetch details of the caller using the provided query
+        const userDetails = await getUserDetailsById(caller_id); // Assuming this function fetches user details
 
         res.json({
-            msg: 'Call data fetched successfully',
+            msg: 'Call created successfully',
             error: false,
-            data: {
-                user: user ? user : null,
-                call: call,
-            },
+            call: result.rows[0],
+            caller_details: userDetails, // Include caller details in the response
         });
     } catch (error) {
-        console.error('Error fetching data:', error);
-        res.status(500).json({ msg: 'Error fetching data', error: true });
+        res.status(500).json({ error: error.message });
+    }
+
+}
+
+const updateCallDuration = async (req, res) => {
+    try {
+        const { caller_id, call_id, call_duration } = req.body;
+
+        // Check if caller_id exists in the users table
+        const callerCheckQuery = `
+        SELECT id FROM users WHERE id = $1;
+      `;
+
+        const callerCheckResult = await pool.query(callerCheckQuery, [caller_id]);
+
+        if (callerCheckResult.rows.length !== 1) {
+            return res.status(400).json({ msg: 'Caller does not exist', error: true });
+        }
+
+        // Check if call_id exists in the calls table
+        const callCheckQuery = `
+        SELECT * FROM calls WHERE call_id = $1;
+      `;
+
+        const callCheckResult = await pool.query(callCheckQuery, [call_id]);
+
+        if (callCheckResult.rows.length !== 1) {
+            return res.status(400).json({ msg: 'Call does not exist', error: true });
+        }
+
+        // Update the call duration
+        const updateCallQuery = `
+        UPDATE calls SET call_duration = $1 WHERE call_id = $2 RETURNING *;
+      `;
+
+        const updateResult = await pool.query(updateCallQuery, [call_duration, call_id]);
+
+        // Fetch details of the caller using the provided query
+        const userDetails = await getUserDetailsById(caller_id); // Assuming this function fetches user details
+
+        res.json({
+            msg: 'Call duration updated successfully',
+            error: false,
+            call: updateResult.rows[0],
+            caller_details: userDetails, // Include caller details in the response
+        });
+    } catch (error) {
+        res.status(500).json({ error: error.message });
+    }
+};
+
+const getCallsByCallerId = async (req, res) => {
+    const callerId = req.params.caller_id; // Caller ID from parameters
+    const { page = 1, limit = 10 } = req.query; // Pagination parameters
+  
+    try {
+      // Fetch total count of calls made by the specified caller_id
+      const countQuery = `
+        SELECT COUNT(*) AS total_count FROM calls WHERE caller_id = $1;
+      `;
+  
+      const countResult = await pool.query(countQuery, [callerId]);
+      const totalCalls = parseInt(countResult.rows[0].total_count);
+  
+      // If there are no calls for the caller, return an empty response
+      if (totalCalls === 0) {
+        return res.status(200).json({
+          msg: 'No calls found for the caller',
+          error: false,
+          count: 0,
+          calls: { 
+            data: [],
+          },
+        });
+      }
+  
+      // Fetch caller details only when there are calls
+      const userDetails = await getUserDetailsById(callerId); // Fetch caller details using the provided function
+  
+      // Fetch calls made by the specified caller_id with pagination
+      const offset = (page - 1) * limit;
+      const getCallsQuery = `
+        SELECT * FROM calls WHERE caller_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3;
+      `;
+  
+      const callsResult = await pool.query(getCallsQuery, [callerId, limit, offset]);
+      const calls = callsResult.rows;
+  
+      res.status(200).json({
+        msg: 'Calls retrieved successfully',
+        error: false,
+        count: totalCalls,
+        caller_details: userDetails,
+        calls: {
+          count: calls.length,
+          data: calls,
+        },
+      });
+    } catch (error) {
+      res.status(500).json({ msg: 'Internal server error', error: true });
+    }
+}
+
+const getCallByCallId = async (req, res) => {
+    const { caller_id, call_id } = req.body; // Caller ID and Call ID from request body
+
+    try {
+      // Check if caller_id exists in the users table
+      const callerCheckQuery = `
+        SELECT id FROM users WHERE id = $1;
+      `;
+  
+      const callerCheckResult = await pool.query(callerCheckQuery, [caller_id]);
+  
+      if (callerCheckResult.rows.length !== 1) {
+        return res.status(404).json({ msg: 'Caller not found', error: true });
+      }
+  
+      // Fetch caller details
+      const userDetails = await getUserDetailsById(caller_id); // Fetch caller details using the provided function
+  
+      // Fetch details of the specific call made by the specified caller_id
+      const getCallQuery = `
+        SELECT * FROM calls WHERE caller_id = $1 AND call_id = $2;
+      `;
+  
+      const callResult = await pool.query(getCallQuery, [caller_id, call_id]);
+      const call = callResult.rows[0];
+  
+      if (!call) {
+        return res.status(404).json({ msg: 'Call not found for the specified caller', error: true });
+      }
+  
+      res.status(200).json({
+        msg: 'Specific call retrieved successfully',
+        error: false,
+        caller_details: userDetails,
+        call: call,
+      });
+    } catch (error) {
+      res.status(500).json({ msg: 'Internal server error', error: true });
     }
 };
 
 const removeCallByCallId = async (req, res) => {
-    const { callerId, callId } = req.params;
+    const { caller_id, call_id } = req.body; // Caller ID and Call ID from request body
 
     try {
-        const getCallQuery = `
-            DELETE FROM calls
-            WHERE caller_id = $1 AND call_id = $2
-            RETURNING *;
-        `;
-
-        const callRemovalResult = await pool.query(getCallQuery, [callerId, callId]);
-        const removedCall = callRemovalResult.rows[0];
-
-        if (!removedCall) {
-            return res.json({
-                msg: 'No call found for the provided CallerId and CallId',
-                error: false,
-                data: null,
-            });
-        }
-
-        res.json({
-            msg: 'Call removed successfully',
-            error: false,
-            data: {
-                removedCall,
-            },
-        });
+      // Check if caller_id exists in the users table
+      const callerCheckQuery = `
+        SELECT id FROM users WHERE id = $1;
+      `;
+  
+      const callerCheckResult = await pool.query(callerCheckQuery, [caller_id]);
+  
+      if (callerCheckResult.rows.length !== 1) {
+        return res.status(404).json({ msg: 'Caller not found', error: true });
+      }
+  
+      // Delete the specific call made by the specified caller_id
+      const deleteCallQuery = `
+        DELETE FROM calls WHERE caller_id = $1 AND call_id = $2 RETURNING *;
+      `;
+  
+      const deletedCallResult = await pool.query(deleteCallQuery, [caller_id, call_id]);
+      const deletedCall = deletedCallResult.rows[0];
+  
+      if (!deletedCall) {
+        return res.status(404).json({ msg: 'Call not found for the specified caller', error: true });
+      }
+  
+      res.status(200).json({
+        msg: 'Call removed successfully',
+        error: false,
+        deleted_call: deletedCall,
+      });
     } catch (error) {
-        console.error('Error removing call:', error);
-        res.status(500).json({ msg: 'Error removing call', error: true });
+      res.status(500).json({ msg: 'Internal server error', error: true });
     }
 };
 
-module.exports = { createcall, getCallsByCallerId, getCallByCallId, removeCallByCallId };
+module.exports = { createcall, updateCallDuration, getCallsByCallerId, getCallByCallId, removeCallByCallId };

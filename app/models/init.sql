@@ -181,10 +181,11 @@ CREATE TABLE IF NOT EXISTS Feedback (
 ); 
 
 CREATE TABLE IF NOT EXISTS calls (
-    call_id SERIAL PRIMARY KEY,
-    caller_id INT REFERENCES users(id),
-    receiver_id INT REFERENCES users(id),
-    call_status VARCHAR(20) CHECK (call_status IN ('INCOMING', 'OUTGOING')),
-    call_duration_minutes INT,
-    call_type VARCHAR(20) CHECK (call_type IN ('AUDIO', 'VIDEO'))
+  call_id SERIAL PRIMARY KEY,
+  caller_id INT REFERENCES users(id),
+  receiver_id INT REFERENCES users(id),
+  channel_name VARCHAR(255) UNIQUE,
+  call_type VARCHAR(20) CHECK (call_type IN ('AUDIO', 'VIDEO')) ,
+  call_duration TIME,
+  created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
