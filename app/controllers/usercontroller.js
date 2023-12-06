@@ -374,10 +374,14 @@ const updateuserprofile = async (req, res) => {
         });
     } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }  
+    }
 };
 
-const imagePath = 'https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701837514/email_template_nlwqow.png'; 
+const imagePath = 'https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701837514/email_template_nlwqow.png';
+const logo = "https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701863140/logo_iw9fap.png";
+const twitter = "https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701865005/twitter_fnifjv.png"
+const fb = "https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701865043/fb_mnkz7w.png"
+const insta = " https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701865074/insta_lnp7x8.png"
 
 const forgetpassword = async (req, res) => {
 
@@ -412,6 +416,30 @@ const forgetpassword = async (req, res) => {
                         font-family: Arial, sans-serif;
                         background-color: #f4f4f4;
                         color: #333;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .header {
+                        background-color: #FFEEB6; /* Yellow background color */
+                        padding: 20px;
+                        text-align: center;
+                        border-radius: 5px;
+                    }
+                    .logo-container {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        align-content:center;
+                        margin-bottom: 10px;
+                    }
+                    .logo {
+                        max-width: 50px; /* Adjust size as needed */
+                        margin-right: 10px; /* Space between logo and text */
+                    }
+                    .flirt-waves {
+                        font-size: 24px;
+                        color: black;
+                        margin: 0; /* Remove default margins */
                     }
                     .container {
                         max-width: 600px;
@@ -420,30 +448,49 @@ const forgetpassword = async (req, res) => {
                         background-color: #fff;
                         border-radius: 8px;
                         box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
-                    }
-                    .header {
                         text-align: center;
-                        margin-bottom: 20px;
+                    }
+                    .centered-image {
+                        display: inline-block;
+                        margin: 0 5px; /* Adjust spacing between icons */
+                        max-width: 20px; /* Adjust size as needed */
                     }
                     .otp {
+                        background-color: #FFEEB6; /* Yellow background color */
+                        padding: 10px;
+                        width: 300px;
                         font-size: 24px;
                         text-align: center;
                         margin-top: 40px;
                         margin-bottom: 20px;
-                        color: #ff6600;
+                        letter-spacing: 5px;
+                        border-radius: 50px;
+                        color: #F5BF03;
                     }
+                    /* Add more styles as needed */
                 </style>
             </head>
             <body>
-                <div class="container">
-                    <div class="header">
-                        <img  src="${imagePath}" alt="Embedded Image" style="max-width: 100px;" />
+                <div class="header">
+                    <div class="logo-container">
+                   
+                    <img class="logo" src="${logo}" alt="Logo">
+                    <p class="flirt-waves">Flirt Waves</p>
+                   
                     </div>
-                    // <h1>Password Reset OTP</h1>
-                    <p>Your OTP for password reset is: <strong class="otp">${otp}</strong></p>
-                    <!-- You can add more HTML for styling or formatting -->
-                    <p>Additional information...</p>
-                    <p><img src="https://example.com/icon.png" alt="Icon" style="max-width: 50px;"></p>
+                </div>
+                <div class="container">
+                    <!-- Second Image -->
+                    <img src="${imagePath}" alt="Embedded Image" style="width: 150px;">
+                    <!-- Rest of your email content -->
+                    <p style="color: #606060; margin: 15px 0;">Great choice on joining Flirt Waves! To get the most out of your experience, please verify your email by clicking the link below:</p>
+                    <strong class="otp">${otp}</strong>            
+                    <p style="color: #606060; margin: 15px 0;">No worries if you didn't request this - just ignore the email, and your account <br/> will stay inactive.<br/>Looking forward to having you on board!</p>
+                    <div style="text-align: center;">
+                        <img src="${fb}" alt="Facebook" class="centered-image">
+                        <img src="${insta}" alt="Instagram" class="centered-image">
+                        <img src="${twitter}" alt="Twitter" class="centered-image">
+                    </div>
                 </div>
             </body>
             </html>
@@ -630,7 +677,7 @@ const updateUserBlockStatus = async (req, res) => {
     }
 };
 
-const blockUser = async (req, res) => { 
+const blockUser = async (req, res) => {
 
     const { userId } = req.params; // ID of the user performing the block action
     const { blockuserId } = req.body; // ID of the user to be blocked
@@ -701,18 +748,18 @@ const blockUser = async (req, res) => {
 const getUsersWithFilters = async (req, res) => {
 
     const { id } = req.params;
-    const { name, interested_in,relation_type,cooking_skill ,exercise } = req.body;
-  
+    const { name, interested_in, relation_type, cooking_skill, exercise } = req.body;
+
     try {
-      // Check if the user exists
-      const userQuery = 'SELECT id FROM Users WHERE id = $1';
-      const user = await pool.query(userQuery, [id]);
-  
-      if (user.rows.length === 0) {
-        return res.status(404).json({ error: true, msg: 'User not found.' });
-      }
-  
-      let query = `
+        // Check if the user exists
+        const userQuery = 'SELECT id FROM Users WHERE id = $1';
+        const user = await pool.query(userQuery, [id]);
+
+        if (user.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'User not found.' });
+        }
+
+        let query = `
         SELECT 'Gender' as table_name, id, gender as matched_field FROM Gender WHERE gender ILIKE $1
         UNION ALL
         SELECT 'Relationship' as table_name, id, relation_type as matched_field FROM Relationship WHERE relation_type ILIKE $1
@@ -731,46 +778,46 @@ const getUsersWithFilters = async (req, res) => {
         UNION ALL
         SELECT 'Smoking' as table_name, id, smoking_opinion as matched_field FROM Smoking WHERE smoking_opinion ILIKE $1
       `;
-  
-      const queryParams = [`%${name}%`];
-  
-      if (interested_in) {
-        // Add a check for interested_in against Gender table
-        query += `
+
+        const queryParams = [`%${name}%`];
+
+        if (interested_in) {
+            // Add a check for interested_in against Gender table
+            query += `
           UNION ALL
           SELECT 'InterestedIn' as table_name, id, gender as matched_field FROM Gender WHERE id = $${queryParams.length + 1}
         `;
-        queryParams.push(interested_in);
-      }if (relation_type) {
-        query += `
+            queryParams.push(interested_in);
+        } if (relation_type) {
+            query += `
           UNION ALL
           SELECT 'RelationType' as table_name, id, relation_type as matched_field FROM Relationship WHERE id = $${queryParams.length + 1}
         `;
-        queryParams.push(relation_type);
-      }if (cooking_skill) {
-        query += `
+            queryParams.push(relation_type);
+        } if (cooking_skill) {
+            query += `
           UNION ALL
           SELECT 'Cookingskill' as table_name, id, cooking_skill as matched_field FROM Cookingskill WHERE id = $${queryParams.length + 1}
         `;
-        queryParams.push(cooking_skill);
-      }
-      if (exercise) {
-        query += `
+            queryParams.push(cooking_skill);
+        }
+        if (exercise) {
+            query += `
           UNION ALL
           SELECT 'Exercise' as table_name, id, exercise as matched_field FROM Exercise WHERE id = $${queryParams.length + 1}
         `;
-        queryParams.push(exercise);
-      } 
-  
-      const { rows } = await pool.query(query, queryParams);
-  
-      if (rows.length > 0) {
-        res.json({ error: false, data: rows.map(row => ({ id: row.id, value: row.matched_field })) });
-      } else {
-        res.status(404).json({ error: true, msg: 'No matching records found.' });
-      }
+            queryParams.push(exercise);
+        }
+
+        const { rows } = await pool.query(query, queryParams);
+
+        if (rows.length > 0) {
+            res.json({ error: false, data: rows.map(row => ({ id: row.id, value: row.matched_field })) });
+        } else {
+            res.status(404).json({ error: true, msg: 'No matching records found.' });
+        }
     } catch (error) {
-      res.status(500).json({ error: true, msg: 'Internal server error.' });
+        res.status(500).json({ error: true, msg: 'Internal server error.' });
     }
 
 };
@@ -1001,17 +1048,17 @@ const getCurrentlyOnlineUsers = async (req, res) => {
         LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
         LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
         WHERE u.deleted_status = false AND u.online_status = true AND u.block_status = false`;
-    
-    if (userId) {
-        query += ` AND u.id != '${userId}'`;
-    }
-    
-    if (page && limit) {
-        query += `
+
+        if (userId) {
+            query += ` AND u.id != '${userId}'`;
+        }
+
+        if (page && limit) {
+            query += `
             OFFSET ${offset}
             LIMIT ${limit}
         `;
-    }
+        }
 
         const result = await pool.query(query);
 
