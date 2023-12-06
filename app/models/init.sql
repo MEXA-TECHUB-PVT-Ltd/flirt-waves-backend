@@ -40,7 +40,7 @@ CREATE TABLE IF NOT EXISTS Users (
   online_status BOOLEAN DEFAULT false, 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW(),
-  deleted_at timestamp DEFAULT NOW(),
+  deleted_at timestamp DEFAULT NULL,
   last_active TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 ); 
 
@@ -65,6 +65,7 @@ CREATE TABLE IF NOT EXISTS UserActivity (
 
 CREATE TABLE IF NOT EXISTS Gender (
   id SERIAL PRIMARY KEY,
+  image VARCHAR(255), 
   gender VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
@@ -72,7 +73,7 @@ CREATE TABLE IF NOT EXISTS Gender (
  
 CREATE TABLE IF NOT EXISTS Relationship (
   id SERIAL PRIMARY KEY,
-  user_id INTEGER,
+  image VARCHAR(255), 
   relation_type VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
@@ -80,6 +81,7 @@ CREATE TABLE IF NOT EXISTS Relationship (
 
 CREATE TABLE IF NOT EXISTS Cookingskill (
   id SERIAL PRIMARY KEY,
+  image VARCHAR(255), 
   cooking_skill VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
@@ -87,6 +89,7 @@ CREATE TABLE IF NOT EXISTS Cookingskill (
 
 CREATE TABLE IF NOT EXISTS Habits (
   id SERIAL PRIMARY KEY,
+  image VARCHAR(255), 
   habit VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
@@ -94,6 +97,7 @@ CREATE TABLE IF NOT EXISTS Habits (
 
 CREATE TABLE IF NOT EXISTS Exercise (
   id SERIAL PRIMARY KEY,
+  image VARCHAR(255), 
   exercise VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
@@ -101,6 +105,7 @@ CREATE TABLE IF NOT EXISTS Exercise (
 
 CREATE TABLE IF NOT EXISTS Hobbies (
   id SERIAL PRIMARY KEY,
+  image VARCHAR(255), 
   hobby VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
@@ -108,6 +113,7 @@ CREATE TABLE IF NOT EXISTS Hobbies (
 
 CREATE TABLE IF NOT EXISTS Nightlife (
   id SERIAL PRIMARY KEY,
+  image VARCHAR(255), 
   night_life VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
@@ -115,6 +121,7 @@ CREATE TABLE IF NOT EXISTS Nightlife (
 
 CREATE TABLE IF NOT EXISTS Kids (
   id SERIAL PRIMARY KEY,
+  image VARCHAR(255), 
   kids_opinion VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()
@@ -122,6 +129,7 @@ CREATE TABLE IF NOT EXISTS Kids (
 
 CREATE TABLE IF NOT EXISTS Smoking (
   id SERIAL PRIMARY KEY,
+  image VARCHAR(255), 
   smoking_opinion VARCHAR(255), 
   created_at timestamp DEFAULT NOW(),
   updated_at timestamp DEFAULT NOW()

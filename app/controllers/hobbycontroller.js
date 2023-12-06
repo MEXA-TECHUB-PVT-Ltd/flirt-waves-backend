@@ -2,43 +2,45 @@ const pool = require("../config/dbconfig")
 
 const addhobby = async (req, res) => {
     try {
-        const { hobby } = req.body;
+        const { hobby, image } = req.body; // Extract 'hobby' and 'image' from request body
+    
         const newHobbies = await pool.query(
-            'INSERT INTO Hobbies (hobby) VALUES ($1) RETURNING *',
-            [hobby]
+          'INSERT INTO Hobbies (hobby, image) VALUES ($1, $2) RETURNING *',
+          [hobby, image] // Include both 'hobby' and 'image' in the query parameters
         );
+    
         res.json({
-            msg: 'Hobby added successfully',
-            error: false,
-            data: newHobbies.rows[0],
+          msg: 'Hobby added successfully',
+          error: false,
+          data: newHobbies.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const updatehobby = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
-        const { hobby } = req.body;
-
+        const { hobby, image } = req.body; // Extract 'hobby' and 'image' from request body
+    
         const updatedHobbies = await pool.query(
-            'UPDATE Hobbies SET hobby = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [hobby, id]
+          'UPDATE Hobbies SET hobby = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+          [hobby, image, id] // Include 'hobby', 'image', and 'id' in the query parameters
         );
-
+    
         if (updatedHobbies.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'Hobby not found' });
+          return res.status(404).json({ error: true, msg: 'Hobby not found' });
         }
-
+    
         res.json({
-            msg: 'Hobby updated successfully',
-            error: false,
-            data: updatedHobbies.rows[0],
+          msg: 'Hobby updated successfully',
+          error: false,
+          data: updatedHobbies.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const deletehobby = async (req, res) => {

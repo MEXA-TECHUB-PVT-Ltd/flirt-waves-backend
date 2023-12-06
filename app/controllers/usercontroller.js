@@ -240,105 +240,141 @@ const getalluserbyID = async (req, res) => {
 const updateuserprofile = async (req, res) => {
 
     try {
-        const { userid } = req.params; // Get the user ID from the URL parameters
+        const { userid } = req.params;
         const {
             name, dob, location, latitude, longitude, height, gender, interested_in, relation_type,
             cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life, images
         } = req.body;
 
-        // Check if the user exists before performing the update
         const userExists = await pool.query('SELECT * FROM Users WHERE id = $1', [userid]);
 
         if (userExists.rows.length === 0) {
             return res.status(404).json({ error: true, msg: 'User not found' });
         }
 
-        // Validation of provided IDs against respective tables
-        const isValidIds = await Promise.all([
-            pool.query('SELECT id FROM Gender WHERE id = $1', [interested_in]),
-            pool.query('SELECT id FROM Relationship WHERE id = $1', [relation_type]),
-            pool.query('SELECT id FROM Cookingskill WHERE id = $1', [cooking_skill]),
-            pool.query('SELECT id FROM Habits WHERE id = $1', [habit]),
-            pool.query('SELECT id FROM Exercise WHERE id = $1', [exercise]),
-            pool.query('SELECT id FROM Hobbies WHERE id = $1', [hobby]),
-            pool.query('SELECT id FROM Smoking WHERE id = $1', [smoking_opinion]),
-            pool.query('SELECT id FROM Kids WHERE id = $1', [kids_opinion]),
-            pool.query('SELECT id FROM Nightlife WHERE id = $1', [night_life]),
-        ]);
+        const updateFields = [];
+        const updateValues = [];
 
-        // Check if any of the provided IDs are invalid
-        if (isValidIds.some(result => result.rows.length === 0)) {
-            return res.status(400).json({ error: true, msg: "Invalid ID's provided" });
+        if (name !== undefined) {
+            updateFields.push('name = $' + (updateValues.length + 1));
+            updateValues.push(name);
+        }
+        if (dob !== undefined) {
+            updateFields.push('dob = $' + (updateValues.length + 1));
+            updateValues.push(dob);
+        }
+        if (location !== undefined) {
+            updateFields.push('location = $' + (updateValues.length + 1));
+            updateValues.push(location);
+        }
+        if (latitude !== undefined) {
+            updateFields.push('latitude = $' + (updateValues.length + 1));
+            updateValues.push(latitude);
+        }
+        if (longitude !== undefined) {
+            updateFields.push('longitude = $' + (updateValues.length + 1));
+            updateValues.push(longitude);
+        }
+        if (height !== undefined) {
+            updateFields.push('height = $' + (updateValues.length + 1));
+            updateValues.push(height);
+        }
+        if (gender !== undefined) {
+            updateFields.push('gender = $' + (updateValues.length + 1));
+            updateValues.push(gender);
+        }
+        if (interested_in !== undefined) {
+            updateFields.push('interested_in = $' + (updateValues.length + 1));
+            updateValues.push(interested_in);
+        }
+        if (relation_type !== undefined) {
+            updateFields.push('relation_type = $' + (updateValues.length + 1));
+            updateValues.push(relation_type);
+        }
+        if (cooking_skill !== undefined) {
+            updateFields.push('cooking_skill = $' + (updateValues.length + 1));
+            updateValues.push(cooking_skill);
+        }
+        if (habit !== undefined) {
+            updateFields.push('habit = $' + (updateValues.length + 1));
+            updateValues.push(habit);
+        }
+        if (hobby !== undefined) {
+            updateFields.push('hobby = $' + (updateValues.length + 1));
+            updateValues.push(hobby);
+        }
+        if (exercise !== undefined) {
+            updateFields.push('exercise = $' + (updateValues.length + 1));
+            updateValues.push(exercise);
+        }
+        if (smoking_opinion !== undefined) {
+            updateFields.push('smoking_opinion = $' + (updateValues.length + 1));
+            updateValues.push(smoking_opinion);
+        }
+        if (kids_opinion !== undefined) {
+            updateFields.push('kids_opinion = $' + (updateValues.length + 1));
+            updateValues.push(kids_opinion);
+        }
+        if (night_life !== undefined) {
+            updateFields.push('night_life = $' + (updateValues.length + 1));
+            updateValues.push(night_life);
+        }
+        if (images !== undefined) {
+            updateFields.push('images = $' + (updateValues.length + 1));
+            updateValues.push(JSON.stringify(images));
         }
 
-        // Perform the user profile update
-        const updatedUser = await pool.query(
-            `UPDATE Users 
-            SET name = $1, 
-                dob = $2, 
-                location = $3, 
-                height = $4, 
-                gender = $5,
-                interested_in = $6, 
-                relation_type = $7, 
-                cooking_skill = $8, 
-                habit = $9,
-                hobby = $10, 
-                exercise = $11, 
-                smoking_opinion = $12, 
-                kids_opinion = $13,
-                night_life = $14,
-                images = $15,  -- Update the images field here
-                latitude = $16,
-                longitude = $17,
-                updated_at = NOW()
-            WHERE id = $18
-            RETURNING *`,
-            [
-                name, dob, location, height, gender, interested_in, relation_type,
-                cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion,
-                night_life, JSON.stringify(images), latitude, longitude, userid  // Pass 'images' as the 15th parameter
-            ]
-        );
+        updateValues.push(userid);
 
-        // Fetch associated data based on the updated user profile
+        const updateSetClause = updateFields.join(', ');
+
+        const updateQuery = `
+            UPDATE Users 
+            SET ${updateSetClause}, 
+                updated_at = NOW()
+            WHERE id = $${updateValues.length}
+            RETURNING *
+        `;
+
+        const updatedUser = await pool.query(updateQuery, updateValues);
+
+        // Fetch associated data based on the updated user profile (unchanged)
         const query = `
-        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-        u.deleted_status, u.block_status, u.dob, u.height, u.location, u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
-        u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
-        g.gender AS interested_in_data,
-        r.relation_type AS relation_type_data,
-        c.cooking_skill AS cooking_skill_data,
-        h.habit AS habit_data,
-        e.exercise AS exercise_data,
-        hb.hobby AS hobby_data,
-        s.smoking_opinion AS smoking_opinion_data,
-        k.kids_opinion AS kids_opinion_data,
-        n.night_life AS night_life_data
-        FROM Users u
-        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-        WHERE u.id = $1
-    `; // Your query for fetching associated data (as previously provided)
+            SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+                u.deleted_status, u.block_status, u.dob, u.height, u.location, u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
+                u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
+                g.gender AS interested_in_data,
+                r.relation_type AS relation_type_data,
+                c.cooking_skill AS cooking_skill_data,
+                h.habit AS habit_data,
+                e.exercise AS exercise_data,
+                hb.hobby AS hobby_data,
+                s.smoking_opinion AS smoking_opinion_data,
+                k.kids_opinion AS kids_opinion_data,
+                n.night_life AS night_life_data
+                FROM Users u
+                LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+                LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+                LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+                LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+                LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+                LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+                LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+                LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+                LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+                WHERE u.id = $1
+        `;
 
         const userData = await pool.query(query, [userid]);
 
         res.json({
             msg: 'User profile updated successfully',
             error: false,
-            data: userData.rows[0], // Return the updated user profile with associated data
+            data: userData.rows[0],
         });
     } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
-
+    }  
 };
 
 const imagePath = 'https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701837514/email_template_nlwqow.png'; 
@@ -594,9 +630,7 @@ const updateUserBlockStatus = async (req, res) => {
     }
 };
 
-const blockUser = async (req, res) => {
-    // const { userId } = req.params; // ID of the user performing the block action
-    // const { blockuserId } = req.body; // ID of the user to be blocked
+const blockUser = async (req, res) => { 
 
     const { userId } = req.params; // ID of the user performing the block action
     const { blockuserId } = req.body; // ID of the user to be blocked
@@ -667,47 +701,76 @@ const blockUser = async (req, res) => {
 const getUsersWithFilters = async (req, res) => {
 
     const { id } = req.params;
-    const { name } = req.body;
-
+    const { name, interested_in,relation_type,cooking_skill ,exercise } = req.body;
+  
     try {
-        // Check if the user exists
-        const userQuery = 'SELECT id FROM Users WHERE id = $1';
-        const user = await pool.query(userQuery, [id]);
-
-        if (user.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'User not found.' });
-        }
-
-        const query = `
-           
-    SELECT 'Gender' as table_name, id, gender as matched_field FROM Gender WHERE gender ILIKE $1
-    UNION ALL
-    SELECT 'Relationship' as table_name, id, relation_type as matched_field FROM Relationship WHERE relation_type ILIKE $1
-    UNION ALL
-    SELECT 'Cookingskill' as table_name, id, cooking_skill as matched_field FROM Cookingskill WHERE cooking_skill ILIKE $1
-    UNION ALL 
-    SELECT 'Habits' as table_name, id, habit as matched_field FROM Habits WHERE habit ILIKE $1
-    UNION ALL
-    SELECT 'Exercise' as table_name, id, exercise as matched_field FROM Exercise WHERE exercise ILIKE $1
-    UNION ALL
-    SELECT 'Hobbies' as table_name, id, hobby as matched_field FROM Hobbies WHERE hobby ILIKE $1
-    UNION ALL
-    SELECT 'Nightlife' as table_name, id, night_life as matched_field FROM Nightlife WHERE night_life ILIKE $1
-    UNION ALL
-    SELECT 'Kids' as table_name, id, kids_opinion as matched_field FROM Kids WHERE kids_opinion ILIKE $1
-    UNION ALL
-    SELECT 'Smoking' as table_name, id, smoking_opinion as matched_field FROM Smoking WHERE smoking_opinion ILIKE $1
+      // Check if the user exists
+      const userQuery = 'SELECT id FROM Users WHERE id = $1';
+      const user = await pool.query(userQuery, [id]);
+  
+      if (user.rows.length === 0) {
+        return res.status(404).json({ error: true, msg: 'User not found.' });
+      }
+  
+      let query = `
+        SELECT 'Gender' as table_name, id, gender as matched_field FROM Gender WHERE gender ILIKE $1
+        UNION ALL
+        SELECT 'Relationship' as table_name, id, relation_type as matched_field FROM Relationship WHERE relation_type ILIKE $1
+        UNION ALL
+        SELECT 'Cookingskill' as table_name, id, cooking_skill as matched_field FROM Cookingskill WHERE cooking_skill ILIKE $1
+        UNION ALL 
+        SELECT 'Habits' as table_name, id, habit as matched_field FROM Habits WHERE habit ILIKE $1
+        UNION ALL
+        SELECT 'Exercise' as table_name, id, exercise as matched_field FROM Exercise WHERE exercise ILIKE $1
+        UNION ALL
+        SELECT 'Hobbies' as table_name, id, hobby as matched_field FROM Hobbies WHERE hobby ILIKE $1
+        UNION ALL
+        SELECT 'Nightlife' as table_name, id, night_life as matched_field FROM Nightlife WHERE night_life ILIKE $1
+        UNION ALL
+        SELECT 'Kids' as table_name, id, kids_opinion as matched_field FROM Kids WHERE kids_opinion ILIKE $1
+        UNION ALL
+        SELECT 'Smoking' as table_name, id, smoking_opinion as matched_field FROM Smoking WHERE smoking_opinion ILIKE $1
+      `;
+  
+      const queryParams = [`%${name}%`];
+  
+      if (interested_in) {
+        // Add a check for interested_in against Gender table
+        query += `
+          UNION ALL
+          SELECT 'InterestedIn' as table_name, id, gender as matched_field FROM Gender WHERE id = $${queryParams.length + 1}
         `;
-
-        const { rows } = await pool.query(query, [`%${name}%`]);
-
-        if (rows.length > 0) {
-            res.json({ error: false, data: rows.map(row => ({ id: row.id, value: row.matched_field })) });
-        } else {
-            res.status(404).json({ error: true, msg: 'No matching records found.' });
-        }
+        queryParams.push(interested_in);
+      }if (relation_type) {
+        query += `
+          UNION ALL
+          SELECT 'RelationType' as table_name, id, relation_type as matched_field FROM Relationship WHERE id = $${queryParams.length + 1}
+        `;
+        queryParams.push(relation_type);
+      }if (cooking_skill) {
+        query += `
+          UNION ALL
+          SELECT 'Cookingskill' as table_name, id, cooking_skill as matched_field FROM Cookingskill WHERE id = $${queryParams.length + 1}
+        `;
+        queryParams.push(cooking_skill);
+      }
+      if (exercise) {
+        query += `
+          UNION ALL
+          SELECT 'Exercise' as table_name, id, exercise as matched_field FROM Exercise WHERE id = $${queryParams.length + 1}
+        `;
+        queryParams.push(exercise);
+      } 
+  
+      const { rows } = await pool.query(query, queryParams);
+  
+      if (rows.length > 0) {
+        res.json({ error: false, data: rows.map(row => ({ id: row.id, value: row.matched_field })) });
+      } else {
+        res.status(404).json({ error: true, msg: 'No matching records found.' });
+      }
     } catch (error) {
-        res.status(500).json({ error: true, msg: 'Internal server error.' });
+      res.status(500).json({ error: true, msg: 'Internal server error.' });
     }
 
 };
@@ -834,37 +897,15 @@ const getDashboardprofiles = async (req, res) => {
                 const queryDatePlus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() + 5));
                 const queryDateMinus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() - 5));
 
-                // Query to fetch similar users based on interests and age difference, excluding the provided user's ID
+                // Query to fetch users with the same interested_in and age difference of 5 years
                 let similarUsersQuery = `
-            SELECT u.id, u.name, u.email, u.signup_type, u.images, u.device_id,
-              u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
-              u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
-              g.gender AS interested_in_data,
-              r.relation_type AS relation_type_data,
-              c.cooking_skill AS cooking_skill_data,
-              h.habit AS habit_data,
-              e.exercise AS exercise_data,
-              hb.hobby AS hobby_data,
-              s.smoking_opinion AS smoking_opinion_data,
-              k.kids_opinion AS kids_opinion_data,
-              n.night_life AS night_life_data
-            FROM Users u
-            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-            WHERE u.deleted_status = false
-            AND u.id != $1
-            AND u.interested_in = $2
-            AND u.dob BETWEEN $3 AND $4
-            OFFSET ${offset}
-            LIMIT ${limit}
-          `;
+                    SELECT * FROM users
+                    WHERE id != $1
+                    AND interested_in = $2
+                    AND dob BETWEEN $3 AND $4
+                    OFFSET ${offset}
+                    LIMIT ${limit}
+                `;
 
                 const { rows: data } = await pool.query(similarUsersQuery, [userId, interested_in, queryDateMinus5Years, queryDatePlus5Years]);
 
@@ -901,7 +942,7 @@ const getrecentprofiles = async (req, res) => {
             return res.status(404).json({ msg: 'User not found', error: true });
         }
 
-        const query = 'SELECT * FROM Users WHERE created_at >= $1 AND id != $2 OFFSET $3 LIMIT $4';
+        const query = 'SELECT * FROM Users WHERE created_at >= $1 AND id != $2 AND block_status != true OFFSET $3 LIMIT $4';
         const queryParams = [twentyFourHoursAgo, userId, offset, limit];
 
         const usersLast24Hours = await pool.query(query, queryParams);
@@ -937,40 +978,40 @@ const getCurrentlyOnlineUsers = async (req, res) => {
         }
 
         let query = `
-            SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-                u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
-                u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
-                g.gender AS interested_in_data,
-                r.relation_type AS relation_type_data,
-                c.cooking_skill AS cooking_skill_data,
-                h.habit AS habit_data,
-                e.exercise AS exercise_data,
-                hb.hobby AS hobby_data,
-                s.smoking_opinion AS smoking_opinion_data,
-                k.kids_opinion AS kids_opinion_data,
-                n.night_life AS night_life_data
-            FROM Users u
-            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-            WHERE u.deleted_status = false AND u.online_status = true`;
-
-        if (userId) {
-            query += ` AND u.id != '${userId}'`;
-        }
-
-        if (page && limit) {
-            query += `
-                OFFSET ${offset}
-                LIMIT ${limit}
-            `;
-        }
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+            u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
+            u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+            g.gender AS interested_in_data,
+            r.relation_type AS relation_type_data,
+            c.cooking_skill AS cooking_skill_data,
+            h.habit AS habit_data,
+            e.exercise AS exercise_data,
+            hb.hobby AS hobby_data,
+            s.smoking_opinion AS smoking_opinion_data,
+            k.kids_opinion AS kids_opinion_data,
+            n.night_life AS night_life_data
+        FROM Users u
+        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+        WHERE u.deleted_status = false AND u.online_status = true AND u.block_status = false`;
+    
+    if (userId) {
+        query += ` AND u.id != '${userId}'`;
+    }
+    
+    if (page && limit) {
+        query += `
+            OFFSET ${offset}
+            LIMIT ${limit}
+        `;
+    }
 
         const result = await pool.query(query);
 
@@ -1052,7 +1093,7 @@ const searchUserByName = async (req, res) => {
         }
 
         // Perform a search query based on the provided name using ILIKE for pattern matching
-        const users = await pool.query('SELECT * FROM Users WHERE name ILIKE $1', [`%${name}%`]);
+        const users = await pool.query('SELECT * FROM Users WHERE name ILIKE $1 AND block_status = false', [`%${name}%`]);
 
         if (users.rows.length === 0) {
             return res.status(404).json({ error: true, msg: 'No users found with that name' });
@@ -1072,28 +1113,28 @@ const getAllUsersWithBlockStatusTrue = async (req, res) => {
 
     try {
         let query = `
-        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image, u.device_id,
-               u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
-               u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
-               g.gender AS gender_data,
-               r.relation_type AS relation_type_data,
-               c.cooking_skill AS cooking_skill_data,
-               h.habit AS habit_data,
-               e.exercise AS exercise_data,
-               hb.hobby AS hobby_data,
-               s.smoking_opinion AS smoking_opinion_data,
-               k.kids_opinion AS kids_opinion_data,
-               n.night_life AS night_life_data
-        FROM Users u
-        LEFT JOIN Gender g ON u.gender::varchar = g.id::varchar
-        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+                u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender,u.dob, u.verified_status, u.report_status,
+                u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
+                g.gender AS interested_in_data,
+                r.relation_type AS relation_type_data,
+                c.cooking_skill AS cooking_skill_data,
+                h.habit AS habit_data,
+                e.exercise AS exercise_data,
+                hb.hobby AS hobby_data,
+                s.smoking_opinion AS smoking_opinion_data,
+                k.kids_opinion AS kids_opinion_data,
+                n.night_life AS night_life_data
+            FROM Users u
+            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
         WHERE u.block_status = true
       `;
 
@@ -1108,7 +1149,7 @@ const getAllUsersWithBlockStatusTrue = async (req, res) => {
 
         const users = result.rows;
         return res.status(200).json({
-            msg: 'Users with block_status as true',
+            msg: 'Blocked users fetched',
             error: false,
             count: users.length,
             data: users,

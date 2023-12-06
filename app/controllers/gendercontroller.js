@@ -2,11 +2,12 @@ const pool = require("../config/dbconfig")
 
 const creategender = async (req, res) => {
   try {
-    const { gender } = req.body;
+    const { gender, image } = req.body; // Extracting 'gender' and 'image' from request body
     const newGender = await pool.query(
-      'INSERT INTO gender (gender) VALUES ($1) RETURNING *',
-      [gender]
+      'INSERT INTO Gender (gender, image) VALUES ($1, $2) RETURNING *',
+      [gender, image] // Using both 'gender' and 'image' in the query parameters
     );
+    
     res.json({ msg: "Gender created succussfully ", error: false, data: newGender.rows[0] });
   } catch (error) {
     res.status(500).json({ error: true, msg: error.message });
@@ -16,11 +17,11 @@ const creategender = async (req, res) => {
 const updateGender = async (req, res) => {
   try {
     const { id } = req.params; // Get the ID from the URL parameters
-    const { gender } = req.body;
+    const { gender, image } = req.body; // Extract 'gender' and 'image' from request body
 
     const updatedGender = await pool.query(
-      'UPDATE gender SET gender = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-      [gender, id]
+      'UPDATE gender SET gender = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+      [gender, image, id] // Include 'gender', 'image', and 'id' in the query parameters
     );
 
     if (updatedGender.rows.length === 0) {

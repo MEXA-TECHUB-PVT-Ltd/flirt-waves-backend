@@ -24,7 +24,7 @@ const addFeedback = async (req, res) => {
         const userDetailsQuery = `
         SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
         u.deleted_status, u.block_status, u.height, u.location, u.gender, u.dob,u.latitude,u.longitude, u.verified_status, u.report_status,
-        u.created_at, u.updated_at, u.last_active,
+        u.deleted_at, u.created_at, u.updated_at, u.last_active,
         g.gender AS interested_in_data,
         r.relation_type AS relation_type_data,
         c.cooking_skill AS cooking_skill_data,
@@ -99,7 +99,7 @@ const updateFeedback = async (req, res) => {
         const userDetailsQuery = `
         SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
         u.deleted_status, u.block_status, u.height, u.location, u.gender, u.dob,u.latitude,u.longitude, u.verified_status, u.report_status,
-        u.created_at, u.updated_at, u.last_active,
+        u.deleted_at, u.created_at, u.updated_at, u.last_active,
         g.gender AS interested_in_data,
         r.relation_type AS relation_type_data,
         c.cooking_skill AS cooking_skill_data,
@@ -195,7 +195,7 @@ const getAllFeedbacksByUserId = async (req, res) => {
         const userQuery = `
         SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
         u.deleted_status, u.block_status, u.height, u.location, u.gender, u.dob,u.latitude,u.longitude, u.verified_status, u.report_status,
-        u.created_at, u.updated_at, u.last_active,
+        u.deleted_at, u.created_at, u.updated_at, u.last_active,
         g.gender AS interested_in_data,
         r.relation_type AS relation_type_data,
         c.cooking_skill AS cooking_skill_data,

@@ -2,43 +2,45 @@ const pool = require("../config/dbconfig")
 
 const addhabits = async (req, res) => {
     try {
-        const { habit } = req.body;
+        const { habit, image } = req.body; // Extract 'habit' and 'image' from request body
+    
         const newHabit = await pool.query(
-            'INSERT INTO Habits (habit) VALUES ($1) RETURNING *',
-            [habit]
+          'INSERT INTO Habits (habit, image) VALUES ($1, $2) RETURNING *',
+          [habit, image] // Include both 'habit' and 'image' in the query parameters
         );
+    
         res.json({
-            msg: 'Habit added successfully',
-            error: false,
-            data: newHabit.rows[0],
+          msg: 'Habit added successfully',
+          error: false,
+          data: newHabit.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const updateHabits = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
-        const { habit } = req.body;
-
+        const { habit, image } = req.body; // Extract 'habit' and 'image' from request body
+    
         const updatedHabits = await pool.query(
-            'UPDATE Habits SET habit = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [habit, id]
+          'UPDATE Habits SET habit = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+          [habit, image, id] // Include 'habit', 'image', and 'id' in the query parameters
         );
-
+    
         if (updatedHabits.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'Habit not found' });
+          return res.status(404).json({ error: true, msg: 'Habit not found' });
         }
-
+    
         res.json({
-            msg: 'Habit updated successfully',
-            error: false,
-            data: updatedHabits.rows[0],
+          msg: 'Habit updated successfully',
+          error: false,
+          data: updatedHabits.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const deleteHabits = async (req, res) => {
@@ -107,23 +109,34 @@ const getusersofhabit = async (req, res) => {
     }
 
     try {
-        // Check if the ID exists in the Users table
-        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
-        const userExistResult = await pool.query(userExistQuery, [habit_id]);
+        // Check if there are users associated with the habit_id
+        const usersExistQuery = 'SELECT COUNT(*) FROM Users WHERE habit = $1';
+        const usersExistResult = await pool.query(usersExistQuery, [habit_id]);
 
-        if (userExistResult.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        const numberOfUsers = parseInt(usersExistResult.rows[0].count);
+
+        if (numberOfUsers === 0) {
+            const habitQuery = 'SELECT * FROM Habits WHERE id = $1';
+            const habitResult = await pool.query(habitQuery, [habit_id]);
+            const habitData = habitResult.rows;
+
+            const response = {
+                error: false,
+                users: [],
+                habit_details: habitData,
+            };
+
+            return res.status(200).json(response);
         }
 
         // Fetch users associated with the habit_id
         const usersQuery = 'SELECT * FROM Users WHERE habit = $1';
         const usersResult = await pool.query(usersQuery, [habit_id]);
+        const usersData = usersResult.rows;
 
         // Fetch habit details for the provided habit_id
         const habitQuery = 'SELECT * FROM Habits WHERE id = $1';
         const habitResult = await pool.query(habitQuery, [habit_id]);
-
-        const usersData = usersResult.rows;
         const habitData = habitResult.rows;
 
         const response = {
@@ -137,6 +150,7 @@ const getusersofhabit = async (req, res) => {
         console.error('Error:', error.message);
         res.status(500).json({ error: true, msg: 'Internal server error' });
     }
+    
 };
 
 const filterHabits = async (req, res) => {

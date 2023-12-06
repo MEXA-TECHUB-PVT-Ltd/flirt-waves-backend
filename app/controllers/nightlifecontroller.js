@@ -2,43 +2,45 @@ const pool = require("../config/dbconfig")
 
 const addnightlife = async (req, res) => {
     try {
-        const { night_life } = req.body;
+        const { night_life, image } = req.body; // Extract 'night_life' and 'image' from request body
+    
         const newNightlife = await pool.query(
-            'INSERT INTO Nightlife (night_life) VALUES ($1) RETURNING *',
-            [night_life]
+          'INSERT INTO Nightlife (night_life, image) VALUES ($1, $2) RETURNING *',
+          [night_life, image] // Include both 'night_life' and 'image' in the query parameters
         );
+    
         res.json({
-            msg: 'Night life added successfully',
-            error: false,
-            data: newNightlife.rows[0],
+          msg: 'Night life added successfully',
+          error: false,
+          data: newNightlife.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const updatenightlife = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
-        const { night_life } = req.body;
-
+        const { night_life, image } = req.body; // Extract 'night_life' and 'image' from request body
+    
         const updatedNightlife = await pool.query(
-            'UPDATE Nightlife SET night_life = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [night_life, id]
+          'UPDATE Nightlife SET night_life = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+          [night_life, image, id] // Include 'night_life', 'image', and 'id' in the query parameters
         );
-
+    
         if (updatedNightlife.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'Night life not found' });
+          return res.status(404).json({ error: true, msg: 'Night life not found' });
         }
-
+    
         res.json({
-            msg: 'Night life updated successfully',
-            error: false,
-            data: updatedNightlife.rows[0],
+          msg: 'Night life updated successfully',
+          error: false,
+          data: updatedNightlife.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const deletenightlife = async (req, res) => {
