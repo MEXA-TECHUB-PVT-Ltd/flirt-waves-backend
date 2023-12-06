@@ -3,6 +3,8 @@ const jwt = require('jsonwebtoken');
 const crypto = require('crypto');
 const pool = require("../config/dbconfig")
 const nodemailer = require('nodemailer');
+const fs = require('fs');
+const path = require('path');
 
 function isValidEmail(email) {
     const emailRegex = /^[a-zA-Z0-9._-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,4}$/;
@@ -141,7 +143,7 @@ const getallusers = async (req, res) => {
     try {
         let query = `
             SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-                u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
+                u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender,u.dob, u.verified_status, u.report_status,
                 u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
                 g.gender AS interested_in_data,
                 r.relation_type AS relation_type_data,
@@ -193,7 +195,7 @@ const getalluserbyID = async (req, res) => {
     try {
         const query = `
         SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-        u.deleted_status, u.block_status, u.height, u.location,u.latitude, u.longitude, u.gender, u.verified_status, u.report_status,
+        u.deleted_status, u.block_status, u.height, u.location,u.latitude, u.longitude, u.gender, u.dob, u.verified_status, u.report_status,
         u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
         g.gender AS interested_in_data,
         r.relation_type AS relation_type_data,
@@ -339,6 +341,8 @@ const updateuserprofile = async (req, res) => {
 
 };
 
+const imagePath = 'https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701837514/email_template_nlwqow.png'; 
+
 const forgetpassword = async (req, res) => {
 
     const { email } = req.body;
@@ -362,7 +366,52 @@ const forgetpassword = async (req, res) => {
             from: 'mahreentassawar@gmail.com',
             to: email,
             subject: 'Password Reset OTP',
-            text: `Your OTP for password reset is: ${otp}`,
+            // text: `Your OTP for password reset is: ${otp}`,
+            html: `
+            <html>
+            <head>
+                <style>
+                    /* Add your CSS styles for the email template here */
+                    body {
+                        font-family: Arial, sans-serif;
+                        background-color: #f4f4f4;
+                        color: #333;
+                    }
+                    .container {
+                        max-width: 600px;
+                        margin: 0 auto;
+                        padding: 20px;
+                        background-color: #fff;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                    }
+                    .header {
+                        text-align: center;
+                        margin-bottom: 20px;
+                    }
+                    .otp {
+                        font-size: 24px;
+                        text-align: center;
+                        margin-top: 40px;
+                        margin-bottom: 20px;
+                        color: #ff6600;
+                    }
+                </style>
+            </head>
+            <body>
+                <div class="container">
+                    <div class="header">
+                        <img  src="${imagePath}" alt="Embedded Image" style="max-width: 100px;" />
+                    </div>
+                    // <h1>Password Reset OTP</h1>
+                    <p>Your OTP for password reset is: <strong class="otp">${otp}</strong></p>
+                    <!-- You can add more HTML for styling or formatting -->
+                    <p>Additional information...</p>
+                    <p><img src="https://example.com/icon.png" alt="Icon" style="max-width: 50px;"></p>
+                </div>
+            </body>
+            </html>
+        `,
         };
 
         await transporter.sendMail(mailOptions);
@@ -600,7 +649,7 @@ const blockUser = async (req, res) => {
             LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
             WHERE u.id = $1 AND u.deleted_status = false
         `;
-        
+
         const userDetailsResult = await pool.query(userDetailsQuery, [blockuserId]);
         const blockedUserDetails = userDetailsResult.rows[0];
 

@@ -22,10 +22,10 @@ const addFeedback = async (req, res) => {
         const newFeedback = await pool.query(addFeedbackQuery, [userId, feedback_description]);
 
         const userDetailsQuery = `
-        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image, u.device_id,
-        u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.height, u.location, u.gender, u.dob,u.latitude,u.longitude, u.verified_status, u.report_status,
         u.created_at, u.updated_at, u.last_active,
-        g.gender AS gender_data,
+        g.gender AS interested_in_data,
         r.relation_type AS relation_type_data,
         c.cooking_skill AS cooking_skill_data,
         h.habit AS habit_data,
@@ -35,7 +35,7 @@ const addFeedback = async (req, res) => {
         k.kids_opinion AS kids_opinion_data,
         n.night_life AS night_life_data
  FROM Users u
- LEFT JOIN Gender g ON CAST(u.gender AS INTEGER) = g.id
+ LEFT JOIN Gender g ON CAST(u.interested_in AS INTEGER) = g.id
  LEFT JOIN Relationship r ON CAST(u.relation_type AS INTEGER) = r.id
  LEFT JOIN Cookingskill c ON CAST(u.cooking_skill AS INTEGER) = c.id
  LEFT JOIN Habits h ON CAST(u.habit AS INTEGER) = h.id
@@ -97,10 +97,10 @@ const updateFeedback = async (req, res) => {
 
         // Fetch user details based on the userId if needed
         const userDetailsQuery = `
-        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image, u.device_id,
-        u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.height, u.location, u.gender, u.dob,u.latitude,u.longitude, u.verified_status, u.report_status,
         u.created_at, u.updated_at, u.last_active,
-        g.gender AS gender_data,
+        g.gender AS interested_in_data,
         r.relation_type AS relation_type_data,
         c.cooking_skill AS cooking_skill_data,
         h.habit AS habit_data,
@@ -109,17 +109,17 @@ const updateFeedback = async (req, res) => {
         s.smoking_opinion AS smoking_opinion_data,
         k.kids_opinion AS kids_opinion_data,
         n.night_life AS night_life_data
-    FROM Users u
-    LEFT JOIN Gender g ON CAST(u.gender AS INTEGER) = g.id
-    LEFT JOIN Relationship r ON CAST(u.relation_type AS INTEGER) = r.id
-    LEFT JOIN Cookingskill c ON CAST(u.cooking_skill AS INTEGER) = c.id
-    LEFT JOIN Habits h ON CAST(u.habit AS INTEGER) = h.id
-    LEFT JOIN Exercise e ON CAST(u.exercise AS INTEGER) = e.id
-    LEFT JOIN Hobbies hb ON CAST(u.hobby AS INTEGER) = hb.id
-    LEFT JOIN Smoking s ON CAST(u.smoking_opinion AS INTEGER) = s.id
-    LEFT JOIN Kids k ON CAST(u.kids_opinion AS INTEGER) = k.id
-    LEFT JOIN Nightlife n ON CAST(u.night_life AS INTEGER) = n.id
-    WHERE u.id = $1
+ FROM Users u
+ LEFT JOIN Gender g ON CAST(u.interested_in AS INTEGER) = g.id
+ LEFT JOIN Relationship r ON CAST(u.relation_type AS INTEGER) = r.id
+ LEFT JOIN Cookingskill c ON CAST(u.cooking_skill AS INTEGER) = c.id
+ LEFT JOIN Habits h ON CAST(u.habit AS INTEGER) = h.id
+ LEFT JOIN Exercise e ON CAST(u.exercise AS INTEGER) = e.id
+ LEFT JOIN Hobbies hb ON CAST(u.hobby AS INTEGER) = hb.id
+ LEFT JOIN Smoking s ON CAST(u.smoking_opinion AS INTEGER) = s.id
+ LEFT JOIN Kids k ON CAST(u.kids_opinion AS INTEGER) = k.id
+ LEFT JOIN Nightlife n ON CAST(u.night_life AS INTEGER) = n.id
+ WHERE u.id = $1
         `;
 
         // Execute the user details query as needed
@@ -193,29 +193,29 @@ const getAllFeedbacksByUserId = async (req, res) => {
     try {
         // Fetch user details
         const userQuery = `
-            SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image, u.device_id,
-                u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
-                u.created_at, u.updated_at, u.last_active,
-                g.gender AS gender_data,
-                r.relation_type AS relation_type_data,
-                c.cooking_skill AS cooking_skill_data,
-                h.habit AS habit_data,
-                e.exercise AS exercise_data,
-                hb.hobby AS hobby_data,
-                s.smoking_opinion AS smoking_opinion_data,
-                k.kids_opinion AS kids_opinion_data,
-                n.night_life AS night_life_data
-            FROM Users u
-            LEFT JOIN Gender g ON CAST(u.gender AS INTEGER) = g.id
-            LEFT JOIN Relationship r ON CAST(u.relation_type AS INTEGER) = r.id
-            LEFT JOIN Cookingskill c ON CAST(u.cooking_skill AS INTEGER) = c.id
-            LEFT JOIN Habits h ON CAST(u.habit AS INTEGER) = h.id
-            LEFT JOIN Exercise e ON CAST(u.exercise AS INTEGER) = e.id
-            LEFT JOIN Hobbies hb ON CAST(u.hobby AS INTEGER) = hb.id
-            LEFT JOIN Smoking s ON CAST(u.smoking_opinion AS INTEGER) = s.id
-            LEFT JOIN Kids k ON CAST(u.kids_opinion AS INTEGER) = k.id
-            LEFT JOIN Nightlife n ON CAST(u.night_life AS INTEGER) = n.id
-            WHERE u.id = $1;
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.height, u.location, u.gender, u.dob,u.latitude,u.longitude, u.verified_status, u.report_status,
+        u.created_at, u.updated_at, u.last_active,
+        g.gender AS interested_in_data,
+        r.relation_type AS relation_type_data,
+        c.cooking_skill AS cooking_skill_data,
+        h.habit AS habit_data,
+        e.exercise AS exercise_data,
+        hb.hobby AS hobby_data,
+        s.smoking_opinion AS smoking_opinion_data,
+        k.kids_opinion AS kids_opinion_data,
+        n.night_life AS night_life_data
+ FROM Users u
+ LEFT JOIN Gender g ON CAST(u.interested_in AS INTEGER) = g.id
+ LEFT JOIN Relationship r ON CAST(u.relation_type AS INTEGER) = r.id
+ LEFT JOIN Cookingskill c ON CAST(u.cooking_skill AS INTEGER) = c.id
+ LEFT JOIN Habits h ON CAST(u.habit AS INTEGER) = h.id
+ LEFT JOIN Exercise e ON CAST(u.exercise AS INTEGER) = e.id
+ LEFT JOIN Hobbies hb ON CAST(u.hobby AS INTEGER) = hb.id
+ LEFT JOIN Smoking s ON CAST(u.smoking_opinion AS INTEGER) = s.id
+ LEFT JOIN Kids k ON CAST(u.kids_opinion AS INTEGER) = k.id
+ LEFT JOIN Nightlife n ON CAST(u.night_life AS INTEGER) = n.id
+ WHERE u.id = $1
         `;
 
         const userDetailsResult = await pool.query(userQuery, [userId]);
