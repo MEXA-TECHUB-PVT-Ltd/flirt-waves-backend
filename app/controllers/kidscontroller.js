@@ -2,43 +2,45 @@ const pool = require("../config/dbconfig")
 
 const addkidsopinion = async (req, res) => {
     try {
-        const { kids_opinion } = req.body;
+        const { kids_opinion, image } = req.body; // Extract 'kids_opinion' and 'image' from request body
+    
         const newKids = await pool.query(
-            'INSERT INTO Kids (kids_opinion) VALUES ($1) RETURNING *',
-            [kids_opinion]
+          'INSERT INTO Kids (kids_opinion, image) VALUES ($1, $2) RETURNING *',
+          [kids_opinion, image] // Include both 'kids_opinion' and 'image' in the query parameters
         );
+    
         res.json({
-            msg: 'Kids opinion added successfully',
-            error: false,
-            data: newKids.rows[0],
+          msg: 'Kids opinion added successfully',
+          error: false,
+          data: newKids.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const updatekidsopinion = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
-        const { kids_opinion } = req.body;
-
+        const { kids_opinion, image } = req.body; // Extract 'kids_opinion' and 'image' from request body
+    
         const updatedKids = await pool.query(
-            'UPDATE Kids SET kids_opinion = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [kids_opinion, id]
+          'UPDATE Kids SET kids_opinion = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+          [kids_opinion, image, id] // Include 'kids_opinion', 'image', and 'id' in the query parameters
         );
-
+    
         if (updatedKids.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'Kid opinion not found' });
+          return res.status(404).json({ error: true, msg: 'Kid opinion not found' });
         }
-
+    
         res.json({
-            msg: 'Kid opinion updated successfully',
-            error: false,
-            data: updatedKids.rows[0],
+          msg: 'Kid opinion updated successfully',
+          error: false,
+          data: updatedKids.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const deletekidsopinion = async (req, res) => {

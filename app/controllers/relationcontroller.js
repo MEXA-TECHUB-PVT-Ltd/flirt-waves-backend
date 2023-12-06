@@ -2,11 +2,13 @@ const pool = require("../config/dbconfig")
 
 const createRelationship = async (req, res) => {
   try {
-    const { relation_type } = req.body;
+    const { relation_type, image } = req.body; // Extract 'relation_type' and 'image' from request body
+
     const newRelationship = await pool.query(
-      'INSERT INTO relationship (relation_type) VALUES ($1) RETURNING *',
-      [relation_type]
+      'INSERT INTO relationship (relation_type, image) VALUES ($1, $2) RETURNING *',
+      [relation_type, image] // Include both 'relation_type' and 'image' in the query parameters
     );
+
     res.json({
       msg: 'Relationship created successfully',
       error: false,
@@ -19,34 +21,22 @@ const createRelationship = async (req, res) => {
 
 const updateRelationship = async (req, res) => {
   try {
-    const { userid } = req.params; // Get the user ID from the URL parameters
-    const {
-      name, dob, location, height, gender, interested_in, relation_type,
-      cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life
-    } = req.body;
+    const { id } = req.params; // Get the ID from the URL parameters
+    const { relation_type, image } = req.body; // Extract 'gender' and 'image' from request body
 
-    const updatedUser = await pool.query(
-      `UPDATE Users 
-       SET name = $1, dob = $2, location = $3, height = $4, gender = $5,
-           interested_in = $6, relation_type = $7, cooking_skill = $8, habit = $9,
-           hobby = $10, exercise = $11, smoking_opinion = $12, kids_opinion = $13,
-           night_life = $14, updated_at = NOW()
-       WHERE id = $15
-       RETURNING *`,
-      [
-        name, dob, location, height, gender, interested_in, relation_type,
-        cooking_skill, habit, hobby, exercise, smoking_opinion, kids_opinion, night_life, userid
-      ]
+    const updatedrelation = await pool.query(
+      'UPDATE Relationship SET relation_type = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+      [relation_type, image, id] // Include 'gender', 'image', and 'id' in the query parameters
     );
 
-    if (updatedUser.rows.length === 0) {
-      return res.status(404).json({ error: true, msg: 'User not found or no changes applied' });
+    if (updatedrelation.rows.length === 0) {
+      return res.status(404).json({ error: true, msg: 'Relation not found' });
     }
 
     res.json({
-      msg: 'User profile updated successfully',
+      msg: 'Relation updated successfully',
       error: false,
-      data: updatedUser.rows[0],
+      data: updatedrelation.rows[0],
     });
   } catch (error) {
     res.status(500).json({ error: true, msg: error.message });

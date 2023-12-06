@@ -2,11 +2,13 @@ const pool = require("../config/dbconfig")
 
 const addexercise = async (req, res) => {
     try {
-        const { exercise } = req.body;
+        const { exercise, image } = req.body; // Extract 'exercise' and 'image' from request body
+
         const newExercise = await pool.query(
-            'INSERT INTO Exercise (exercise) VALUES ($1) RETURNING *',
-            [exercise]
+            'INSERT INTO Exercise (exercise, image) VALUES ($1, $2) RETURNING *',
+            [exercise, image] // Include both 'exercise' and 'image' in the query parameters
         );
+
         res.json({
             msg: 'Exercise added successfully',
             error: false,
@@ -20,25 +22,25 @@ const addexercise = async (req, res) => {
 const updateexercise = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
-        const { exercise } = req.body;
-
+        const { exercise, image } = req.body; // Extract 'exercise' and 'image' from request body
+    
         const updatedexercise = await pool.query(
-            'UPDATE Exercise SET exercise = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [exercise, id]
+          'UPDATE Exercise SET exercise = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+          [exercise, image, id] // Include 'exercise', 'image', and 'id' in the query parameters
         );
-
+    
         if (updatedexercise.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'Exercise not found' });
+          return res.status(404).json({ error: true, msg: 'Exercise not found' });
         }
-
+    
         res.json({
-            msg: 'Exercise updated successfully',
-            error: false,
-            data: updatedexercise.rows[0],
+          msg: 'Exercise updated successfully',
+          error: false,
+          data: updatedexercise.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const deleteexercise = async (req, res) => {

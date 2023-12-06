@@ -2,43 +2,45 @@ const pool = require("../config/dbconfig")
 
 const addsmokingopinion = async (req, res) => {
     try {
-        const { smoking_opinion } = req.body;
+        const { smoking_opinion, image } = req.body; // Extract 'smoking_opinion' and 'image' from request body
+    
         const newSmoking = await pool.query(
-            'INSERT INTO Smoking (smoking_opinion) VALUES ($1) RETURNING *',
-            [smoking_opinion]
+          'INSERT INTO Smoking (smoking_opinion, image) VALUES ($1, $2) RETURNING *',
+          [smoking_opinion, image] // Include both 'smoking_opinion' and 'image' in the query parameters
         );
+    
         res.json({
-            msg: 'Smoking opinion added successfully',
-            error: false,
-            data: newSmoking.rows[0],
+          msg: 'Smoking opinion added successfully',
+          error: false,
+          data: newSmoking.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const updateSmokingopinion = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
-        const { smoking_opinion } = req.body;
-
+        const { smoking_opinion, image } = req.body; // Extract 'smoking_opinion' and 'image' from request body
+    
         const updatedSmoking = await pool.query(
-            'UPDATE Smoking SET smoking_opinion = $1, updated_at = NOW() WHERE id = $2 RETURNING *',
-            [smoking_opinion, id]
+          'UPDATE Smoking SET smoking_opinion = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+          [smoking_opinion, image, id] // Include 'smoking_opinion', 'image', and 'id' in the query parameters
         );
-
+    
         if (updatedSmoking.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'Smoking opinion not found' });
+          return res.status(404).json({ error: true, msg: 'Smoking opinion not found' });
         }
-
+    
         res.json({
-            msg: 'Smoking opinion updated successfully',
-            error: false,
-            data: updatedSmoking.rows[0],
+          msg: 'Smoking opinion updated successfully',
+          error: false,
+          data: updatedSmoking.rows[0],
         });
-    } catch (error) {
+      } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-    }
+      }
 };
 
 const deleteSmokingopinion = async (req, res) => {
