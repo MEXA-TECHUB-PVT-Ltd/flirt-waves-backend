@@ -139,9 +139,9 @@ const getFavoriteById = async (req, res) => {
         WHERE Favorites.user_id = $1 AND Favorites.favorite_user_id = $2
         AND u.block_status = false -- Add this condition to exclude users with block_status = true
     `;
-    
-    const favoriteResult = await pool.query(favoriteQuery, [user_id, favorite_id]);
-    const favorite = favoriteResult.rows;
+
+        const favoriteResult = await pool.query(favoriteQuery, [user_id, favorite_id]);
+        const favorite = favoriteResult.rows;
 
         if (favorite.length === 0) {
             return res.status(404).json({ error: true, msg: 'Favorite not found for the user' });
@@ -331,13 +331,36 @@ const getUsersWithSameFavorites = async (req, res) => {
 
         // Query to retrieve users who have added the provided user to their favorites with pagination
         const favoriteUsersQuery = `
-        SELECT u.* FROM Users u
-        INNER JOIN Favorites f ON u.id = f.user_id
-        WHERE f.favorite_user_id = $1
-        AND u.block_status = false  -- Add this condition to exclude users with block_status = true
-        ORDER BY u.id
-        OFFSET $2
-        LIMIT $3
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
+        u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+        g.gender AS interested_in_data,
+        r.relation_type AS relation_type_data,
+        c.cooking_skill AS cooking_skill_data,
+        h.habit AS habit_data,
+        e.exercise AS exercise_data,
+        hb.hobby AS hobby_data,
+        s.smoking_opinion AS smoking_opinion_data,
+        k.kids_opinion AS kids_opinion_data,
+        n.night_life AS night_life_data
+    FROM Users u
+    LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+    LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+    LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+    LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+    LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+    LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+    LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+    LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+    LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+    INNER JOIN Favorites f ON u.id = f.user_id
+    WHERE f.favorite_user_id = $1
+        AND u.deleted_status = false
+        AND u.block_status = false
+        AND u.report_status = false
+    ORDER BY u.id
+    OFFSET $2
+    LIMIT $3
         `;
 
         const favoriteUsersResult = await pool.query(favoriteUsersQuery, [user_id, offset, limit]);

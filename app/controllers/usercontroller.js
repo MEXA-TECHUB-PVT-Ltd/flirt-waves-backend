@@ -851,52 +851,45 @@ const getVerifiedUsers = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
     const { userId } = req.params;
 
+    const offset = (page - 1) * limit;
+
     try {
-        // Check if the userId exists in the Users table
-        const userExistsQuery = `
-            SELECT COUNT(*) AS userCount
-            FROM Users
-            WHERE id = $1
-        `;
+        // Check if the provided userId exists in the Users table
+        const userCheckQuery = `SELECT id FROM Users WHERE id = $1`;
+        const userCheckResult = await pool.query(userCheckQuery, [userId]);
 
-        const userExistsResult = await pool.query(userExistsQuery, [userId]);
-        const userCount = parseInt(userExistsResult.rows[0].userCount);
-
-        if (userCount === 0) {
-            // If the user does not exist, return a 404 Not Found response
-            return res.status(404).json({ error: true, msg: 'User not found' });
+        if (userCheckResult.rows.length === 0) {
+            return res.status(404).json({ msg: 'User not found', error: true });
         }
 
-        // Calculate the OFFSET based on the page and limit
-        const offset = (page - 1) * limit;
-
-        // Query to retrieve verified users with pagination, excluding a specific user
-        const verifiedUsersQuery = `
+        let query = ` 
             SELECT *, COUNT(*) OVER() AS total_count
             FROM Users
             WHERE verified_status = true
             AND id <> $1 -- Exclude specific user
+            AND block_status = false
+            AND report_status = false
+            AND deleted_status = false 
             ORDER BY id
             OFFSET $2
             LIMIT $3
         `;
 
-        const verifiedUsersResult = await pool.query(verifiedUsersQuery, [userId, offset, limit]);
-        const verifiedUsers = verifiedUsersResult.rows;
+        const result = await pool.query(query, [userId, offset, limit]);
 
-        // Extract the total count from the first row of the result
-        const totalCount = verifiedUsers.length > 0 ? verifiedUsers[0].total_count : 0;
+        const users = result.rows;
+        const totalCount = users.length > 0 ? users[0].total_count : 0;
 
-        res.status(200).json({
-            error: false,
+        return res.status(200).json({
             msg: 'Verified users fetched successfully',
-            count: verifiedUsers.length,
+            error: false,
+            count: users.length,
             total_count: totalCount,
-            data: verifiedUsers,
+            data: users,
         });
     } catch (error) {
-        console.error('Error fetching verified users:', error);
-        res.status(500).json({ error: true, msg: 'Internal Server Error' });
+        console.error('Error fetching users:', error);
+        return res.status(500).json({ msg: 'Internal server error', error: true });
     }
 };
 
@@ -934,28 +927,32 @@ const getDashboardprofiles = async (req, res) => {
         }
 
         // Fetch the user's date of birth and interested_in field
-        const userResult = await pool.query('SELECT dob, interested_in FROM users WHERE id = $1', [userId]);
+        const userResult = await pool.query('SELECT dob, interested_in, latitude, longitude FROM users WHERE id = $1', [userId]);
 
         if (userResult.rows.length > 0) {
             const userDOB = userResult.rows[0].dob;
             const interested_in = userResult.rows[0].interested_in;
+            const userLatitude = userResult.rows[0].latitude;
+            const userLongitude = userResult.rows[0].longitude;
 
-            if (userDOB) {
+            if (userDOB && userLatitude !== null && userLongitude !== null) {
                 // Calculate age difference (+5 years or -5 years) from the user's date of birth
                 const queryDatePlus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() + 5));
                 const queryDateMinus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() - 5));
 
                 // Query to fetch users with the same interested_in and age difference of 5 years
                 let similarUsersQuery = `
-                    SELECT * FROM users
+                    SELECT *, 
+                        ( 6371 * acos( cos( radians($3) ) * cos( radians( latitude ) ) * cos( radians( longitude ) - radians($4) ) + sin( radians($3) ) * sin( radians( latitude ) ) ) ) AS distance
+                    FROM users
                     WHERE id != $1
                     AND interested_in = $2
-                    AND dob BETWEEN $3 AND $4
+                    AND dob BETWEEN $5 AND $6
                     OFFSET ${offset}
                     LIMIT ${limit}
                 `;
 
-                const { rows: data } = await pool.query(similarUsersQuery, [userId, interested_in, queryDateMinus5Years, queryDatePlus5Years]);
+                const { rows: data } = await pool.query(similarUsersQuery, [userId, interested_in, userLatitude, userLongitude, queryDateMinus5Years, queryDatePlus5Years]);
 
                 res.status(200).json({
                     msg: "users fetched",
@@ -964,7 +961,7 @@ const getDashboardprofiles = async (req, res) => {
                     data,
                 });
             } else {
-                res.status(404).json({ error: true, msg: 'User date of birth is missing' });
+                res.status(404).json({ error: true, msg: 'User date of birth or coordinates are missing' });
             }
         } else {
             res.status(404).json({ error: true, msg: 'User not found' });
@@ -1048,8 +1045,7 @@ const getCurrentlyOnlineUsers = async (req, res) => {
     LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
     LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
     LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-    WHERE u.deleted_status = false 
-        AND u.online_status = true 
+    WHERE u.deleted_status = false  
         AND u.block_status = false 
         AND u.report_status = false
         AND u.id != '${userId}'
