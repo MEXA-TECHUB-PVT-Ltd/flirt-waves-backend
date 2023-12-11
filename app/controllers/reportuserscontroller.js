@@ -1,11 +1,18 @@
 const pool = require("../config/dbconfig")
 
 const reportuser = async (req, res) => {
-  const { reporter_id } = req.body; // Extract reporter_id from the request body
   const { user_id } = req.params; // Extract user_id from the request parameters
-  const { reason, description } = req.body;
+  const { reporter_id, reason, description } = req.body; // Extract reporter_id, reason, and description from the request body
 
   try {
+    // Check if the user exists and fetch user details
+    const userExistsQuery = 'SELECT * FROM Users WHERE id = $1';
+    const userExistsResult = await pool.query(userExistsQuery, [user_id]);
+
+    if (userExistsResult.rows.length === 0) {
+      return res.status(404).json({ error: true, msg: 'User not found' });
+    }
+
     // Check if the reporter exists
     const reporterExistsQuery = 'SELECT * FROM Users WHERE id = $1';
     const reporterExistsResult = await pool.query(reporterExistsQuery, [reporter_id]);
@@ -14,29 +21,13 @@ const reportuser = async (req, res) => {
       return res.status(404).json({ error: true, msg: 'Reporter not found' });
     }
 
-    // Check if the user to be reported exists
-    const userExistsQuery = 'SELECT * FROM Users WHERE id = $1';
-    const userExistsResult = await pool.query(userExistsQuery, [user_id]);
-
-    if (userExistsResult.rows.length === 0) {
-      return res.status(404).json({ error: true, msg: 'User to be reported not found' });
-    }
-
-    // Check if the user has already been reported
-    const existingReportQuery = 'SELECT * FROM ReportUsers WHERE user_id = $1';
-    const existingReportResult = await pool.query(existingReportQuery, [user_id]);
-
-    if (existingReportResult.rows.length > 0) {
-      return res.status(400).json({ error: true, msg: 'User already reported' });
-    }
-
     // Insert report into ReportUsers table
     const reportUserQuery = 'INSERT INTO ReportUsers (user_id, reason, description, reporter_id) VALUES ($1, $2, $3, $4) RETURNING *';
     const reportUserResult = await pool.query(reportUserQuery, [user_id, reason, description, reporter_id]);
 
-    // Update report_status to true in Users table
+    // Update report_status to true for the reported user
     const updateReportStatusQuery = 'UPDATE Users SET report_status = true WHERE id = $1';
-    await pool.query(updateReportStatusQuery, [user_id]);
+    await pool.query(updateReportStatusQuery, [reporter_id]);
 
     // Get details of the reported user
     const reportedUserQuery = 'SELECT * FROM Users WHERE id = $1';
@@ -52,8 +43,8 @@ const reportuser = async (req, res) => {
       message: 'User reported successfully',
       error: false,
       data: {
-        reported_user: reportedUserDetails,
-        reporting_user: reportingUserDetails,
+        user: reportedUserDetails,
+        reporter: reportingUserDetails,
         report_details: reportUserResult.rows[0],
       },
     });
@@ -69,7 +60,7 @@ const getReportedUsers = async (req, res) => {
 
   try {
     let query = `
-          SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.image, u.device_id,
+          SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
               u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
               u.created_at, u.updated_at, u.last_active,
               g.gender AS gender_data,

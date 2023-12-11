@@ -195,5 +195,6 @@ CREATE TABLE IF NOT EXISTS calls (
   channel_name VARCHAR(255) UNIQUE,
   call_type VARCHAR(20) CHECK (call_type IN ('AUDIO', 'VIDEO')) ,
   call_duration TIME,
+  call_status VARCHAR(20) CHECK (call_status IN ('ACCEPT', 'DECLINED', 'NOTANSWERED')),
   created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
