@@ -23,54 +23,44 @@ app.use(cors({
 
 app.use(express.json())
 
-const createDirectory = (directory) => {
-    if (!fs.existsSync(directory)) {
-      fs.mkdirSync(directory, { recursive: true });
-    }
-  };
-  
-  // Directory for uploads
-  const uploadDirectory = './uploads';
-  createDirectory(uploadDirectory); // Create the directory if it doesn't exist
-  
-  // Set storage engine
-  const storage = multer.diskStorage({
-    destination: function (req, file, cb) {
-      cb(null, uploadDirectory);
-    },
-    filename: function (req, file, cb) {
-      cb(null, `${file.fieldname}-${Date.now()}${path.extname(file.originalname)}`);
-    }
-  });
-  
-  // Initialize multer upload
-  const upload = multer({
-    storage: storage,
-    limits: { fileSize: 1024 * 1024 * 5 }, // Limit file size if needed
-    fileFilter: function (req, file, cb) {
-      if (file.mimetype.startsWith('image/')) {
-        cb(null, true);
-      } else {
-        cb(new Error('Only images are allowed'));
-      }
-    }
-  });
-  
-  app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
+const storage = multer.diskStorage({
+  destination: (req, file, cb) => {
+    // Check the 'type' field in the request to determine the folder
+    const uploadType = req.body.type === 'broker' ? 'broker' : 'profile_image';
+    const uploadPath = `./uploads/${uploadType}`;
 
-// Your existing endpoint for uploading images
-app.post('/upload', upload.array('images', 5), (req, res) => {
-  if (!req.files || req.files.length === 0) {
-    return res.status(400).json({ error: true, msg: 'No images uploaded' });
+    // Check if the directory exists, if not, create it
+    if (!fs.existsSync(uploadPath)) {
+      fs.mkdirSync(uploadPath, { recursive: true });
+    }
+
+    cb(null, uploadPath);
+  },
+  filename: (req, file, cb) => {
+    cb(null, `${Date.now()}_${file.originalname}`);
+  },
+});
+
+const upload = multer({ storage });
+
+// POST endpoint for uploading images
+app.post('/upload', upload.single('image'), (req, res) => {
+  if (!req.file) {
+    return res.status(400).json({ error: true, msg: 'No file uploaded.' });
   }
 
-  const filepaths = req.files.map(file => file.path);
-  res.status(200).json({ error: false, msg: 'Images uploaded successfully', files: filepaths });
+  const uploadType = req.body.type === 'broker' ? 'broker' : 'profile_image';
+  const imageUrl = `uploads/${uploadType}/${req.file.filename}`;
+
+  res.status(200).json({ error: false, imageUrl: imageUrl });
 });
+
+// Serve uploaded images statically
+app.use('/uploads', express.static(path.join(__dirname, 'uploads')));
 // app.use('/uploadimage', imageUploadRouter); 
 
 
-// app.use("/admin", require("./app/routes/admin/adminroutes"))
+app.use("/admin", require("./app/routes/admin/adminroutes"))
 app.use("/user", require("./app/routes/user/userroutes"));
 app.use("/gender", require("./app/routes/gender/genderroutes"));
 app.use("/relationship", require("./app/routes/relationship/relationshiproutes"));
@@ -85,6 +75,10 @@ app.use("/report", require("./app/routes/reportusers/reportusersroutes"));
 app.use("/matches", require("./app/routes/matches/matchesroutes"));
 app.use("/favourites", require("./app/routes/favourite/favouriteroutes"));
 app.use("/crush", require("./app/routes/crush/crushroutes"));
+app.use("/faqs", require("./app/routes/faq/faqroutes"));
+app.use("/feedback", require("./app/routes/feedback/feedbackroutes"));
+app.use("/payment", require("./app/routes/stripe/striperoutes"));
+app.use("/calls", require("./app/routes/calling/callroutes"));
 
 app.get('/', (req, res) => {
     res.json({ message: 'Flirt Waves !' });
