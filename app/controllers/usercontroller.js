@@ -674,36 +674,31 @@ const deleteuser = async (req, res) => {
 }
 
 const deleteuserpermanently = async (req, res) => {
+    const userId = req.params.userId; // Extract user ID from request parameters
+
     try {
-        // Extract user ID from the request or any other parameter that identifies the user
-        const userId = req.params.id; // Change this based on your route
-
-        // Query to delete the user and all associated records
-        const query = `
-            DELETE FROM Users
+        // Perform deletion query
+        const deleteQuery = `
+            UPDATE Users
+            SET deleted_status = true, deleted_at = NOW() 
             WHERE id = $1
-            RETURNING *;
         `;
+        const deleteResult = await pool.query(deleteQuery, [userId]);
 
-        const result = await pool.query(query, [userId]);
-
-        const deletedUser = result.rows[0]; // Assuming only one user is deleted
-        if (!deletedUser) {
+        if (deleteResult.rowCount === 1) {
+            return res.status(200).json({
+                msg: 'User deleted successfully',
+                error: false,
+            });
+        } else {
             return res.status(404).json({
-                msg: "User not found",
+                msg: 'User not found',
                 error: true,
-                data: null
             });
         }
-
-        return res.status(200).json({
-            msg: "User deleted successfully",
-            error: false,
-            data: deletedUser
-        });
     } catch (error) {
-        console.error('Error deleting user and associated records:', error);
-        res.status(500).json({ msg: 'Internal server error', error: true });
+        console.error('Error deleting user:', error);
+        return res.status(500).json({ msg: 'Internal server error', error: true });
     }
 };
 
