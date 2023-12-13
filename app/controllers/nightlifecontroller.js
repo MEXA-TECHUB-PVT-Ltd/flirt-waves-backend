@@ -131,6 +131,7 @@ const getNightlifeByID = async (req, res) => {
 
 const getusersofnightlifeopinion = async (req, res) => {
     const { nightlife_id } = req.body;
+    const { page, limit } = req.query;
 
     if (!nightlife_id) {
         return res.status(400).json({ error: true, msg: 'Nightlife ID is missing in the request body' });
@@ -138,26 +139,48 @@ const getusersofnightlifeopinion = async (req, res) => {
 
     try {
         // Check if the ID exists in the Users table
-        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistQuery = 'SELECT COUNT(*) FROM Users WHERE night_life = $1 AND deleted_status = false AND block_status = false AND report_status = false';
         const userExistResult = await pool.query(userExistQuery, [nightlife_id]);
+        const totalCount = parseInt(userExistResult.rows[0].count);
 
-        if (userExistResult.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        if (totalCount === 0) {
+            return res.status(404).json({ error: true, msg: 'No users found for this nightlife opinion' });
         }
 
-        // Fetch users associated with the nightlife_id
-        const usersQuery = 'SELECT * FROM Users WHERE night_life = $1';
-        const usersResult = await pool.query(usersQuery, [nightlife_id]);
+        let usersData;
+        // Fetch users associated with the nightlife_id with pagination and additional conditions
+        if (page && limit) {
+            const offset = (page - 1) * limit;
+            const usersQuery = `
+                SELECT * FROM Users 
+                WHERE night_life = $1 
+                AND deleted_status = false 
+                AND block_status = false 
+                AND report_status = false 
+                LIMIT $2 OFFSET $3
+            `;
+            const usersResult = await pool.query(usersQuery, [nightlife_id, limit, offset]);
+            usersData = usersResult.rows;
+        } else {
+            const allUsersQuery = `
+                SELECT * FROM Users 
+                WHERE night_life = $1 
+                AND deleted_status = false 
+                AND block_status = false 
+                AND report_status = false
+            `;
+            const allUsersResult = await pool.query(allUsersQuery, [nightlife_id]);
+            usersData = allUsersResult.rows;
+        }
 
         // Fetch nightlife opinion details for the provided nightlife_id
         const nightlifeQuery = 'SELECT * FROM Nightlife WHERE id = $1';
         const nightlifeResult = await pool.query(nightlifeQuery, [nightlife_id]);
-
-        const usersData = usersResult.rows;
         const nightlifeData = nightlifeResult.rows;
 
         const response = {
             error: false,
+            count: totalCount,
             users: usersData,
             nightlife_opinion_details: nightlifeData,
         };

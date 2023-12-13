@@ -93,6 +93,11 @@ const usersignin = async (req, res) => {
 
         const userData = user.rows[0]; // User data retrieved from the database
 
+        // Check if the user is marked as deleted
+        if (userData.deleted_status === true) {
+            return res.status(401).json({ error: true, msg: 'User account has been deleted' });
+        }
+
         if (userData.signup_type === 'email') {
             // User signed up using email, require password for login
             if (!password || typeof password !== 'string') {
@@ -134,52 +139,108 @@ const usersignin = async (req, res) => {
         res.status(500).json({ error: true, msg: 'Internal server error' });
     }
 
+
+    // const { email, password, device_id } = req.body;
+
+    // // Validate email format
+    // if (!isValidEmail(email)) {
+    //     return res.status(400).json({ error: true, msg: 'Invalid email format' });
+    // }
+
+    // try {
+    //     // Check if the user with the provided email exists
+    //     const user = await pool.query('SELECT * FROM Users WHERE email = $1', [email]);
+
+    //     if (user.rows.length === 0) {
+    //         return res.status(401).json({ error: true, msg: 'User not found' });
+    //     }
+
+    //     const userData = user.rows[0]; // User data retrieved from the database
+
+    //     if (userData.signup_type === 'email') {
+    //         // User signed up using email, require password for login
+    //         if (!password || typeof password !== 'string') {
+    //             return res.status(400).json({ error: true, msg: 'Password is required for email login' });
+    //         }
+
+    //         const hashedPassword = userData.password;
+
+    //         // Check if the provided password matches the hashed password in the database
+    //         const isPasswordValid = await bcrypt.compare(password, hashedPassword);
+
+    //         if (!isPasswordValid) {
+    //             return res.status(401).json({ error: true, msg: 'Invalid password' });
+    //         }
+    //     } else if (userData.signup_type === 'google' || userData.signup_type === 'apple') {
+    //         // User signed up using Google or Apple, validate token for login
+    //         const tokenFromDB = userData.token; // Token stored in the database during signup
+
+    //         if (!tokenFromDB || typeof tokenFromDB !== 'string') {
+    //             return res.status(401).json({ error: true, msg: 'Token not found' });
+    //         }
+    //     }
+
+    //     // Update device_id if provided during sign-in
+    //     if (device_id && typeof device_id === 'string') {
+    //         await pool.query('UPDATE Users SET device_id = $1, last_active = CURRENT_TIMESTAMP, online_status = true WHERE email = $2', [device_id, email]);
+    //     } else {
+    //         await pool.query('UPDATE Users SET last_active = CURRENT_TIMESTAMP, online_status = true WHERE email = $1', [email]);
+    //     }
+
+    //     // Fetch updated user data after the device_id update
+    //     const updatedUser = await pool.query('SELECT * FROM Users WHERE email = $1', [email]);
+    //     const updatedUserData = updatedUser.rows[0];
+
+    //     res.status(200).json({ error: false, msg: 'Login successful', data: updatedUserData });
+
+    // } catch (error) {
+    //     console.error(error);
+    //     res.status(500).json({ error: true, msg: 'Internal server error' });
+    // }
+
 };
 
 const getallusers = async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
+
+    const { page, limit } = req.query;
+    let query = `
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender, u.dob, u.verified_status, u.report_status,
+        u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+        g.gender AS interested_in_data,
+        r.relation_type AS relation_type_data,
+        c.cooking_skill AS cooking_skill_data,
+        h.habit AS habit_data,
+        e.exercise AS exercise_data,
+        hb.hobby AS hobby_data,
+        s.smoking_opinion AS smoking_opinion_data,
+        k.kids_opinion AS kids_opinion_data,
+        n.night_life AS night_life_data
+        FROM Users u
+        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+        WHERE u.deleted_status = false  
+        ORDER BY u.created_at DESC
+    `;
+
+    if (page && limit) {
+        const offset = (page - 1) * limit;
+        query += ` OFFSET ${offset} LIMIT ${limit}`;
+    }
 
     try {
-        let query = `
-            SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-                u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender,u.dob, u.verified_status, u.report_status,
-                u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
-                g.gender AS interested_in_data,
-                r.relation_type AS relation_type_data,
-                c.cooking_skill AS cooking_skill_data,
-                h.habit AS habit_data,
-                e.exercise AS exercise_data,
-                hb.hobby AS hobby_data,
-                s.smoking_opinion AS smoking_opinion_data,
-                k.kids_opinion AS kids_opinion_data,
-                n.night_life AS night_life_data
-            FROM Users u
-            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-            WHERE u.deleted_status = false  
-            ORDER BY u.created_at DESC -- Fetch only users where deleted_status is false
-        `;
-
-        if (page && limit) {
-            query += `
-                OFFSET ${offset}
-                LIMIT ${limit}
-            `;
-        }
-
         const result = await pool.query(query);
-
         const users = result.rows;
+
         return res.status(200).json({
-            msg: 'Users with associated attributes fetched successfully',
+            msg: 'Users fetched successfully',
             error: false,
             count: users.length,
             data: users,
@@ -188,6 +249,7 @@ const getallusers = async (req, res) => {
         console.error('Error fetching users:', error);
         return res.status(500).json({ msg: 'Internal server error', error: true });
     }
+
 }
 
 const getalluserbyID = async (req, res) => {
@@ -893,6 +955,85 @@ const getVerifiedUsers = async (req, res) => {
     }
 };
 
+const checkUserExists = async (userId) => {
+    const client = await pool.connect();
+    const query = 'SELECT * FROM Users WHERE id = $1';
+    const result = await client.query(query, [userId]);
+    client.release();
+    return result.rows.length > 0 ? result.rows[0] : null;
+};
+
+const updateUserSubscriptionStatus = async (req, res) => {
+    const userId = req.params.id;
+    const subscription_status = req.body.subscription_status;
+    console.log(userId, subscription_status)
+    try {
+        const updateQuery = 'UPDATE Users SET subscription_status = $1, updated_at = NOW() WHERE id = $2 RETURNING *';
+        const values = [subscription_status, userId];
+
+        const result = await pool.query(updateQuery, values);
+
+        if (result.rowCount === 0) {
+            return res.status(404).json({ message: 'User not found' });
+        }
+
+        res.json({ message: 'Subscription status updated successfully', user: result.rows[0] });
+    } catch (error) {
+        console.error('Error executing query', error);
+        res.status(500).json({ message: 'Error updating subscription status' });
+    }
+};
+
+const getAllUsersWithSubscription = async (req, res) => {
+    const { page, limit } = req.query;
+    let query = `
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+        u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.gender, u.dob, u.verified_status, u.report_status,
+        u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+        g.gender AS interested_in_data,
+        r.relation_type AS relation_type_data,
+        c.cooking_skill AS cooking_skill_data,
+        h.habit AS habit_data,
+        e.exercise AS exercise_data,
+        hb.hobby AS hobby_data,
+        s.smoking_opinion AS smoking_opinion_data,
+        k.kids_opinion AS kids_opinion_data,
+        n.night_life AS night_life_data
+        FROM Users u
+        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+        WHERE u.deleted_status = false AND u.subscription_status = true
+        ORDER BY u.created_at DESC
+    `;
+
+    if (page && limit) {
+        const offset = (page - 1) * limit;
+        query += ` OFFSET ${offset} LIMIT ${limit}`;
+    }
+
+    try {
+        const result = await pool.query(query);
+        const users = result.rows;
+
+        return res.status(200).json({
+            msg: 'Users with subscription status true fetched successfully',
+            error: false,
+            count: users.length,
+            data: users,
+        });
+    } catch (error) {
+        console.error('Error fetching users with subscription status true:', error);
+        return res.status(500).json({ msg: 'Internal server error', error: true });
+    }
+};
+
 const getVerifiedUserById = async (req, res) => {
     const { id } = req.params;
 
@@ -916,8 +1057,7 @@ const getVerifiedUserById = async (req, res) => {
 };
 
 const getDashboardprofiles = async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
-    const offset = (page - 1) * limit;
+    const { page, limit } = req.query;
 
     try {
         const userId = req.params.userId; // User ID provided in route params
@@ -947,10 +1087,16 @@ const getDashboardprofiles = async (req, res) => {
                     FROM users
                     WHERE id != $1
                     AND interested_in = $2
-                    AND dob BETWEEN $5 AND $6
-                    OFFSET ${offset}
-                    LIMIT ${limit}
+                    AND dob BETWEEN $5 AND $6 
+                    AND deleted_status = false
+                    AND block_status = false
+                    AND report_status = false
                 `;
+
+                if (page && limit) {
+                    const offset = (page - 1) * limit;
+                    similarUsersQuery += ` OFFSET ${offset} LIMIT ${limit}`;
+                }
 
                 const { rows: data } = await pool.query(similarUsersQuery, [userId, interested_in, userLatitude, userLongitude, queryDateMinus5Years, queryDatePlus5Years]);
 
@@ -1008,7 +1154,7 @@ const getrecentprofiles = async (req, res) => {
 }
 
 const getCurrentlyOnlineUsers = async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
+    const { page, limit } = req.query;
     const { userId } = req.params; // Assuming the user ID is provided in the params
 
     const offset = (page - 1) * limit;
@@ -1021,35 +1167,35 @@ const getCurrentlyOnlineUsers = async (req, res) => {
         if (userCheckResult.rows.length === 0) {
             return res.status(404).json({ msg: 'User not found', error: true });
         }
-
         let query = `
-    SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-        u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
-        u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
-        g.gender AS interested_in_data,
-        r.relation_type AS relation_type_data,
-        c.cooking_skill AS cooking_skill_data,
-        h.habit AS habit_data,
-        e.exercise AS exercise_data,
-        hb.hobby AS hobby_data,
-        s.smoking_opinion AS smoking_opinion_data,
-        k.kids_opinion AS kids_opinion_data,
-        n.night_life AS night_life_data
-    FROM Users u
-    LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-    LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-    LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-    LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-    LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-    LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-    LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-    LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-    LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-    WHERE u.deleted_status = false  
-        AND u.block_status = false 
-        AND u.report_status = false
-        AND u.id != '${userId}'
-`;
+        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+            u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
+            u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+            g.gender AS interested_in_data,
+            r.relation_type AS relation_type_data,
+            c.cooking_skill AS cooking_skill_data,
+            h.habit AS habit_data,
+            e.exercise AS exercise_data,
+            hb.hobby AS hobby_data,
+            s.smoking_opinion AS smoking_opinion_data,
+            k.kids_opinion AS kids_opinion_data,
+            n.night_life AS night_life_data
+        FROM Users u
+        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+        WHERE u.deleted_status = false  
+            AND u.block_status = false 
+            AND u.report_status = false
+            AND u.online_status = true
+            AND u.id != '${userId}'
+    `;
 
         if (userId) {
             query += ` AND u.id != '${userId}'`;
@@ -1247,7 +1393,7 @@ const getUsersByYearAndMonth = async (req, res) => {
 };
 
 const getalldeletedusers = async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
+    const { page, limit } = req.query;
     const offset = (page - 1) * limit;
 
     try {
@@ -1263,7 +1409,13 @@ const getalldeletedusers = async (req, res) => {
                 hb.hobby AS hobby_data,
                 s.smoking_opinion AS smoking_opinion_data,
                 k.kids_opinion AS kids_opinion_data,
-                n.night_life AS night_life_data
+                n.night_life AS night_life_data,
+                CASE
+                    WHEN u.deleted_at IS NOT NULL THEN 
+                        GREATEST(90 - EXTRACT(DAY FROM NOW() - u.deleted_at), 0)
+                    ELSE
+                        NULL
+                END AS remaining_days
             FROM Users u
             LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
             LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
@@ -1299,4 +1451,4 @@ const getalldeletedusers = async (req, res) => {
     }
 }
 
-module.exports = { updateUserOnlineStatus, getalldeletedusers, getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, resetpassword, updatePassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName, getAllUsersWithBlockStatusTrue, blockUser };
+module.exports = { updateUserOnlineStatus, getalldeletedusers, getUsersByYearAndMonth, usersignup, usersignin, getallusers, getalluserbyID, updateuserprofile, forgetpassword, resetpassword, updatePassword, deleteuser, deleteuserpermanently, updateUserBlockStatus, getUsersWithFilters, updateUserVerifiedStatus, updateUserSubscriptionStatus, getAllUsersWithSubscription, getVerifiedUsers, getVerifiedUserById, getDashboardprofiles, getrecentprofiles, getCurrentlyOnlineUsers, searchUserByName, getAllUsersWithBlockStatusTrue, blockUser };

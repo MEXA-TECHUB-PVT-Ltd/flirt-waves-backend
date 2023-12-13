@@ -103,6 +103,7 @@ const getAllHabits = async (req, res) => {
 
 const getusersofhabit = async (req, res) => {
     const { habit_id } = req.body;
+    const { page, limit } = req.query;
 
     if (!habit_id) {
         return res.status(400).json({ error: true, msg: 'Habit ID is missing in the request body' });
@@ -110,12 +111,11 @@ const getusersofhabit = async (req, res) => {
 
     try {
         // Check if there are users associated with the habit_id
-        const usersExistQuery = 'SELECT COUNT(*) FROM Users WHERE habit = $1';
+        const usersExistQuery = 'SELECT COUNT(*) FROM Users WHERE habit = $1 AND deleted_status = false AND block_status = false AND report_status = false';
         const usersExistResult = await pool.query(usersExistQuery, [habit_id]);
+        const totalCount = parseInt(usersExistResult.rows[0].count);
 
-        const numberOfUsers = parseInt(usersExistResult.rows[0].count);
-
-        if (numberOfUsers === 0) {
+        if (totalCount === 0) {
             const habitQuery = 'SELECT * FROM Habits WHERE id = $1';
             const habitResult = await pool.query(habitQuery, [habit_id]);
             const habitData = habitResult.rows;
@@ -129,10 +129,31 @@ const getusersofhabit = async (req, res) => {
             return res.status(200).json(response);
         }
 
-        // Fetch users associated with the habit_id
-        const usersQuery = 'SELECT * FROM Users WHERE habit = $1';
-        const usersResult = await pool.query(usersQuery, [habit_id]);
-        const usersData = usersResult.rows;
+        let usersData;
+        // Fetch users associated with the habit_id with pagination and additional conditions
+        if (page && limit) {
+            const offset = (page - 1) * limit;
+            const usersQuery = `
+                SELECT * FROM Users 
+                WHERE habit = $1 
+                AND deleted_status = false 
+                AND block_status = false 
+                AND report_status = false 
+                LIMIT $2 OFFSET $3
+            `;
+            const usersResult = await pool.query(usersQuery, [habit_id, limit, offset]);
+            usersData = usersResult.rows;
+        } else {
+            const allUsersQuery = `
+                SELECT * FROM Users 
+                WHERE habit = $1 
+                AND deleted_status = false 
+                AND block_status = false 
+                AND report_status = false
+            `;
+            const allUsersResult = await pool.query(allUsersQuery, [habit_id]);
+            usersData = allUsersResult.rows;
+        }
 
         // Fetch habit details for the provided habit_id
         const habitQuery = 'SELECT * FROM Habits WHERE id = $1';
@@ -141,6 +162,7 @@ const getusersofhabit = async (req, res) => {
 
         const response = {
             error: false,
+            count: totalCount,
             users: usersData,
             habit_details: habitData,
         };

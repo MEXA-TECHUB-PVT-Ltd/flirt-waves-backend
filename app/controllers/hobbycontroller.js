@@ -131,6 +131,7 @@ const getHobbyById = async (req, res) => {
 
 const getusersofhobby = async (req, res) => {
     const { hobby_id } = req.body;
+    const { page, limit } = req.query;
 
     if (!hobby_id) {
         return res.status(400).json({ error: true, msg: 'Hobby ID is missing in the request body' });
@@ -138,26 +139,48 @@ const getusersofhobby = async (req, res) => {
 
     try {
         // Check if the ID exists in the Users table
-        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistQuery = 'SELECT COUNT(*) FROM Users WHERE hobby = $1 AND deleted_status = false AND block_status = false AND report_status = false';
         const userExistResult = await pool.query(userExistQuery, [hobby_id]);
+        const totalCount = parseInt(userExistResult.rows[0].count);
 
-        if (userExistResult.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        if (totalCount === 0) {
+            return res.status(404).json({ error: true, msg: 'No users found for this hobby' });
         }
 
-        // Fetch users associated with the hobby_id
-        const usersQuery = 'SELECT * FROM Users WHERE hobby = $1';
-        const usersResult = await pool.query(usersQuery, [hobby_id]);
+        let usersData;
+        // Fetch users associated with the hobby_id with pagination and additional conditions
+        if (page && limit) {
+            const offset = (page - 1) * limit;
+            const usersQuery = `
+                SELECT * FROM Users 
+                WHERE hobby = $1 
+                AND deleted_status = false 
+                AND block_status = false 
+                AND report_status = false 
+                LIMIT $2 OFFSET $3
+            `;
+            const usersResult = await pool.query(usersQuery, [hobby_id, limit, offset]);
+            usersData = usersResult.rows;
+        } else {
+            const allUsersQuery = `
+                SELECT * FROM Users 
+                WHERE hobby = $1 
+                AND deleted_status = false 
+                AND block_status = false 
+                AND report_status = false
+            `;
+            const allUsersResult = await pool.query(allUsersQuery, [hobby_id]);
+            usersData = allUsersResult.rows;
+        }
 
         // Fetch hobby details for the provided hobby_id
         const hobbyQuery = 'SELECT * FROM Hobbies WHERE id = $1';
         const hobbyResult = await pool.query(hobbyQuery, [hobby_id]);
-
-        const usersData = usersResult.rows;
         const hobbyData = hobbyResult.rows;
 
         const response = {
             error: false,
+            count: totalCount,
             users: usersData,
             hobby_details: hobbyData,
         };

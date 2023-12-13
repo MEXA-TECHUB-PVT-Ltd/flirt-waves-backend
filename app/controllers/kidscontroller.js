@@ -131,6 +131,7 @@ const getKidopinionByID = async (req, res) => {
 
 const getusersofkidopinion = async (req, res) => {
     const { kids_id } = req.body;
+    const { page, limit } = req.query;
 
     if (!kids_id) {
         return res.status(400).json({ error: true, msg: 'Kids ID is missing in the request body' });
@@ -138,26 +139,48 @@ const getusersofkidopinion = async (req, res) => {
 
     try {
         // Check if the ID exists in the Users table
-        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistQuery = 'SELECT COUNT(*) FROM Users WHERE kids_opinion = $1 AND deleted_status = false AND block_status = false AND report_status = false';
         const userExistResult = await pool.query(userExistQuery, [kids_id]);
+        const totalCount = parseInt(userExistResult.rows[0].count);
 
-        if (userExistResult.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'ID does not exist' });
+        if (totalCount === 0) {
+            return res.status(404).json({ error: true, msg: 'No users found for this kids opinion' });
         }
 
-        // Fetch users associated with the kids_id
-        const usersQuery = 'SELECT * FROM Users WHERE kids_opinion = $1';
-        const usersResult = await pool.query(usersQuery, [kids_id]);
+        let usersData;
+        // Fetch users associated with the kids_id with pagination and additional conditions
+        if (page && limit) {
+            const offset = (page - 1) * limit;
+            const usersQuery = `
+                SELECT * FROM Users 
+                WHERE kids_opinion = $1 
+                AND deleted_status = false 
+                AND block_status = false 
+                AND report_status = false 
+                LIMIT $2 OFFSET $3
+            `;
+            const usersResult = await pool.query(usersQuery, [kids_id, limit, offset]);
+            usersData = usersResult.rows;
+        } else {
+            const allUsersQuery = `
+                SELECT * FROM Users 
+                WHERE kids_opinion = $1 
+                AND deleted_status = false 
+                AND block_status = false 
+                AND report_status = false
+            `;
+            const allUsersResult = await pool.query(allUsersQuery, [kids_id]);
+            usersData = allUsersResult.rows;
+        }
 
         // Fetch kids opinion details for the provided kids_id
         const kidsQuery = 'SELECT * FROM Kids WHERE id = $1';
         const kidsResult = await pool.query(kidsQuery, [kids_id]);
-
-        const usersData = usersResult.rows;
         const kidsData = kidsResult.rows;
 
         const response = {
             error: false,
+            count: totalCount,
             users: usersData,
             kids_opinion_details: kidsData,
         };

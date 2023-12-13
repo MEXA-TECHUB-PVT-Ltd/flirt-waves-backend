@@ -264,4 +264,44 @@ const getAllFeedbacksByUserId = async (req, res) => {
     }
 };
 
-module.exports = { addFeedback, updateFeedback, removeFeedback, getAllFeedbacksByUserId };
+const getAllFeedbacks = async (req, res) => {
+    const { page, limit } = req.query;
+
+    try {
+        // Get total count of all feedbacks
+        const feedbackCountQuery = 'SELECT COUNT(*) FROM Feedback';
+        const feedbackCountResult = await pool.query(feedbackCountQuery);
+        const totalCount = parseInt(feedbackCountResult.rows[0].count);
+
+        let feedbackData;
+        // Fetch all feedbacks with pagination
+        if (page && limit) {
+            const offset = (page - 1) * limit;
+            const feedbackQuery = `
+                SELECT * FROM Feedback 
+                ORDER BY created_at DESC 
+                LIMIT $1 OFFSET $2
+            `;
+            const feedbackResult = await pool.query(feedbackQuery, [limit, offset]);
+            feedbackData = feedbackResult.rows;
+        } else {
+            const allFeedbackQuery = `
+                SELECT * FROM Feedback 
+                ORDER BY created_at DESC
+            `;
+            const allFeedbackResult = await pool.query(allFeedbackQuery);
+            feedbackData = allFeedbackResult.rows;
+        }
+
+        res.status(200).json({
+            error: false,
+            count: totalCount,
+            feedbacks: feedbackData,
+        });
+    } catch (error) {
+        console.error('Error fetching feedbacks:', error);
+        return res.status(500).json({ msg: 'Internal server error', error: true });
+    }
+};
+
+module.exports = { addFeedback, updateFeedback, removeFeedback, getAllFeedbacksByUserId, getAllFeedbacks };

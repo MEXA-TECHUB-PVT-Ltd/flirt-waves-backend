@@ -218,7 +218,7 @@ const getAllFavorites = async (req, res) => {
 };
 
 const removeFavorite = async (req, res) => {
-    const { user_id, favorite_id } = req.params;
+    const { user_id, favorite_user_id } = req.params;
 
     try {
         // Check if the user exists
@@ -227,14 +227,20 @@ const removeFavorite = async (req, res) => {
             return res.status(404).json({ error: true, msg: 'User not found' });
         }
 
+        // Check if the favorite user exists
+        const favoriteUserExists = await pool.query('SELECT EXISTS(SELECT 1 FROM Users WHERE id = $1)', [favorite_user_id]);
+        if (!favoriteUserExists.rows[0].exists) {
+            return res.status(404).json({ error: true, msg: 'Favorite user not found' });
+        }
+
         // Check if the favorite exists in the user's favorites list
-        const favoriteExists = await pool.query('SELECT EXISTS(SELECT 1 FROM Favorites WHERE user_id = $1 AND favorite_user_id = $2)', [user_id, favorite_id]);
+        const favoriteExists = await pool.query('SELECT EXISTS(SELECT 1 FROM Favorites WHERE user_id = $1 AND favorite_user_id = $2)', [user_id, favorite_user_id]);
         if (!favoriteExists.rows[0].exists) {
             return res.status(404).json({ error: true, msg: 'Favorite not found in user favorites' });
         }
 
         // Remove the favorite from the user's favorites list
-        await pool.query('DELETE FROM Favorites WHERE user_id = $1 AND favorite_user_id = $2', [user_id, favorite_id]);
+        await pool.query('DELETE FROM Favorites WHERE user_id = $1 AND favorite_user_id = $2', [user_id, favorite_user_id]);
 
         res.status(200).json({ error: false, msg: 'Favorite removed successfully' });
     } catch (error) {
