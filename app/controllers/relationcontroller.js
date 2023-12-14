@@ -153,35 +153,42 @@ const addpreferncerToUser = async (req, res) => {
 const getusersofrelationtype = async (req, res) => {
 
   const { relation_type_id } = req.body;
+  const { page, limit } = req.query;
 
   if (!relation_type_id) {
     return res.status(400).json({ error: true, msg: 'Relation type ID is missing in the request body' });
   }
 
-  try {
-    // Check if the ID exists in the Users table
-    const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
-    const userExistResult = await pool.query(userExistQuery, [relation_type_id]);
+  let query = `
+    SELECT * FROM Users WHERE relation_type = $1
+  `;
 
-    if (userExistResult.rows.length === 0) {
-      return res.status(404).json({ error: true, msg: 'ID does not exist' });
+  const params = [relation_type_id];
+
+  if (page && limit) {
+    const offset = (page - 1) * limit;
+    query += ` OFFSET $2 LIMIT $3`;
+    params.push(offset, limit);
+  }
+
+  try {
+    const usersResult = await pool.query(query, params);
+
+    if (usersResult.rows.length === 0) {
+      return res.status(404).json({ error: true, msg: 'No users found for the provided relation type ID' });
     }
 
-    // Fetch users associated with the relation_type_id
-    const usersQuery = 'SELECT * FROM Users WHERE relation_type = $1';
-    const usersResult = await pool.query(usersQuery, [relation_type_id]);
-
-    // Fetch relationship details for the provided relation_type_id
-    const relationshipQuery = 'SELECT * FROM Relationship WHERE id = $1';
-    const relationshipResult = await pool.query(relationshipQuery, [relation_type_id]);
-
     const usersData = usersResult.rows;
-    const relationshipData = relationshipResult.rows;
-    console.log(relationshipData);
+
+    // To get the count of users
+    const countQuery = 'SELECT COUNT(*) FROM Users WHERE relation_type = $1';
+    const countResult = await pool.query(countQuery, [relation_type_id]);
+    const totalCount = countResult.rows[0].count;
+
     const response = {
       error: false,
+      count: totalCount,
       users: usersData,
-      relationship_details: relationshipData,
     };
 
     res.status(200).json(response);

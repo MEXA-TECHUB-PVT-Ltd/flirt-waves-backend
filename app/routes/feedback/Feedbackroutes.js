@@ -5,6 +5,7 @@ const feedbackController = require("../../controllers/feedbackcontroller");
 router.post('/addFeedback/:userId', feedbackController.addFeedback);    
 router.put('/updateFeedback/:userId', feedbackController.updateFeedback);
 router.delete('/remove_Feedback/:userId', feedbackController.removeFeedback); 
-router.get('/getAll_user_Feedbacks/:userId', feedbackController.getAllFeedbacksByUserId);      
+router.get('/getAll_user_Feedbacks/:userId', feedbackController.getAllFeedbacksByUserId);  
+router.get('/getAll_users_Feedbacks', feedbackController.getAllFeedbacks);       
 
 module.exports = router;
