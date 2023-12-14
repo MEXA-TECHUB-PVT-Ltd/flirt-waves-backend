@@ -3,44 +3,44 @@ const pool = require("../config/dbconfig")
 const addhabits = async (req, res) => {
     try {
         const { habit, image } = req.body; // Extract 'habit' and 'image' from request body
-    
+
         const newHabit = await pool.query(
-          'INSERT INTO Habits (habit, image) VALUES ($1, $2) RETURNING *',
-          [habit, image] // Include both 'habit' and 'image' in the query parameters
+            'INSERT INTO Habits (habit, image) VALUES ($1, $2) RETURNING *',
+            [habit, image] // Include both 'habit' and 'image' in the query parameters
         );
-    
+
         res.json({
-          msg: 'Habit added successfully',
-          error: false,
-          data: newHabit.rows[0],
+            msg: 'Habit added successfully',
+            error: false,
+            data: newHabit.rows[0],
         });
-      } catch (error) {
+    } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-      }
+    }
 };
 
 const updateHabits = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
         const { habit, image } = req.body; // Extract 'habit' and 'image' from request body
-    
+
         const updatedHabits = await pool.query(
-          'UPDATE Habits SET habit = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
-          [habit, image, id] // Include 'habit', 'image', and 'id' in the query parameters
+            'UPDATE Habits SET habit = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+            [habit, image, id] // Include 'habit', 'image', and 'id' in the query parameters
         );
-    
+
         if (updatedHabits.rows.length === 0) {
-          return res.status(404).json({ error: true, msg: 'Habit not found' });
+            return res.status(404).json({ error: true, msg: 'Habit not found' });
         }
-    
+
         res.json({
-          msg: 'Habit updated successfully',
-          error: false,
-          data: updatedHabits.rows[0],
+            msg: 'Habit updated successfully',
+            error: false,
+            data: updatedHabits.rows[0],
         });
-      } catch (error) {
+    } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-      }
+    }
 };
 
 const deleteHabits = async (req, res) => {
@@ -102,7 +102,7 @@ const getAllHabits = async (req, res) => {
 };
 
 const getusersofhabit = async (req, res) => {
-    const { habit_id } = req.body;
+    const { habit_id, user_id } = req.body;
     const { page, limit } = req.query;
 
     if (!habit_id) {
@@ -130,30 +130,53 @@ const getusersofhabit = async (req, res) => {
         }
 
         let usersData;
-        // Fetch users associated with the habit_id with pagination and additional conditions
+        let query;
+        const params = [habit_id];
+
+        if (user_id) {
+            // Check if the provided user ID exists in the Users table
+            const userCheckQuery = 'SELECT * FROM Users WHERE id = $1 LIMIT 1';
+            const userCheckResult = await pool.query(userCheckQuery, [user_id]);
+
+            if (userCheckResult.rows.length === 0) {
+                return res.status(404).json({ error: true, msg: 'User ID does not exist in the database' });
+            }
+
+            query = `
+          SELECT *,
+          ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
+          * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
+          * sin( radians( latitude ) ) ) ) AS distance,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE habit = $1
+          AND id != $5 -- Exclude the provided user ID
+          AND deleted_status = false
+          AND block_status = false
+          AND report_status = false
+        `;
+
+            params.push(user_id, user_id, user_id, user_id);
+        } else {
+            query = `
+          SELECT *,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE habit = $1
+          AND deleted_status = false
+          AND block_status = false
+          AND report_status = false
+        `;
+        }
+
         if (page && limit) {
             const offset = (page - 1) * limit;
-            const usersQuery = `
-                SELECT * FROM Users 
-                WHERE habit = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false 
-                LIMIT $2 OFFSET $3
-            `;
-            const usersResult = await pool.query(usersQuery, [habit_id, limit, offset]);
-            usersData = usersResult.rows;
-        } else {
-            const allUsersQuery = `
-                SELECT * FROM Users 
-                WHERE habit = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false
-            `;
-            const allUsersResult = await pool.query(allUsersQuery, [habit_id]);
-            usersData = allUsersResult.rows;
+            query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+            params.push(limit, offset);
         }
+
+        const usersResult = await pool.query(query, params);
+        usersData = usersResult.rows;
 
         // Fetch habit details for the provided habit_id
         const habitQuery = 'SELECT * FROM Habits WHERE id = $1';
@@ -162,7 +185,7 @@ const getusersofhabit = async (req, res) => {
 
         const response = {
             error: false,
-            count: totalCount,
+            count: usersData.length,
             users: usersData,
             habit_details: habitData,
         };
@@ -172,7 +195,7 @@ const getusersofhabit = async (req, res) => {
         console.error('Error:', error.message);
         res.status(500).json({ error: true, msg: 'Internal server error' });
     }
-    
+
 };
 
 const filterHabits = async (req, res) => {

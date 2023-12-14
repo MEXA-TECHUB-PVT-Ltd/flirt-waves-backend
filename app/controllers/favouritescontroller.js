@@ -348,40 +348,44 @@ const getUsersWithSameFavorites = async (req, res) => {
         hb.hobby AS hobby_data,
         s.smoking_opinion AS smoking_opinion_data,
         k.kids_opinion AS kids_opinion_data,
-        n.night_life AS night_life_data
-    FROM Users u
-    LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-    LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-    LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-    LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-    LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-    LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-    LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-    LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-    LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-    INNER JOIN Favorites f ON u.id = f.user_id
-    WHERE f.favorite_user_id = $1
+        n.night_life AS night_life_data,
+        ( 6371 * acos( cos( radians($1) ) * cos( radians( u.latitude ) )
+        * cos( radians( u.longitude ) - radians($2) ) + sin( radians($3) )
+        * sin( radians( u.latitude ) ) ) ) AS distance,
+        EXTRACT(YEAR FROM AGE(TO_DATE(u.dob, 'YYYY-MM-DD'))) AS age
+        FROM Users u
+        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+        INNER JOIN Favorites f ON u.id = f.user_id
+        WHERE f.favorite_user_id = $4
+        AND u.id != $5 -- Exclude the provided user ID
         AND u.deleted_status = false
         AND u.block_status = false
         AND u.report_status = false
-    ORDER BY u.id
-    OFFSET $2
-    LIMIT $3
+        ORDER BY u.id
+        OFFSET $6
+        LIMIT $7
         `;
 
-        const favoriteUsersResult = await pool.query(favoriteUsersQuery, [user_id, offset, limit]);
+        const favoriteUsersResult = await pool.query(favoriteUsersQuery, [user_id, user_id, user_id, user_id, user_id, offset, limit]);
         const favoriteUsers = favoriteUsersResult.rows;
 
         // Get total count of users who have added the provided user to their favorites
-        const totalCountQuery = 'SELECT COUNT(*) AS total_count FROM Users u INNER JOIN Favorites f ON u.id = f.user_id WHERE f.favorite_user_id = $1';
+        const totalCountQuery = 'SELECT COUNT(*) AS total_count FROM Users u INNER JOIN Favorites f ON u.id = f.user_id WHERE f.favorite_user_id = $1 AND u.deleted_status = false AND u.block_status = false AND u.report_status = false';
         const totalCountResult = await pool.query(totalCountQuery, [user_id]);
         const totalCount = parseInt(totalCountResult.rows[0].total_count);
 
         res.status(200).json({
             error: false,
             msg: 'Favorite users retrieved successfully',
-            // count: favoriteUsers.length,
-            total_count: favoriteUsers.length,
+            total_count: totalCount,
             data: favoriteUsers,
         });
     } catch (error) {

@@ -61,7 +61,7 @@ const getReportedUsers = async (req, res) => {
   try {
     let query = `
           SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-              u.deleted_status, u.block_status, u.height, u.location, u.verified_status, u.report_status,
+              u.deleted_status, u.block_status, u.height, u.location, u.gender, u.dob, u.verified_status, u.report_status,
               u.created_at, u.updated_at, u.last_active,
               g.gender AS gender_data,
               r.relation_type AS relation_type_data,

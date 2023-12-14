@@ -3,44 +3,44 @@ const pool = require("../config/dbconfig")
 const addhobby = async (req, res) => {
     try {
         const { hobby, image } = req.body; // Extract 'hobby' and 'image' from request body
-    
+
         const newHobbies = await pool.query(
-          'INSERT INTO Hobbies (hobby, image) VALUES ($1, $2) RETURNING *',
-          [hobby, image] // Include both 'hobby' and 'image' in the query parameters
+            'INSERT INTO Hobbies (hobby, image) VALUES ($1, $2) RETURNING *',
+            [hobby, image] // Include both 'hobby' and 'image' in the query parameters
         );
-    
+
         res.json({
-          msg: 'Hobby added successfully',
-          error: false,
-          data: newHobbies.rows[0],
+            msg: 'Hobby added successfully',
+            error: false,
+            data: newHobbies.rows[0],
         });
-      } catch (error) {
+    } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-      }
+    }
 };
 
 const updatehobby = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
         const { hobby, image } = req.body; // Extract 'hobby' and 'image' from request body
-    
+
         const updatedHobbies = await pool.query(
-          'UPDATE Hobbies SET hobby = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
-          [hobby, image, id] // Include 'hobby', 'image', and 'id' in the query parameters
+            'UPDATE Hobbies SET hobby = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+            [hobby, image, id] // Include 'hobby', 'image', and 'id' in the query parameters
         );
-    
+
         if (updatedHobbies.rows.length === 0) {
-          return res.status(404).json({ error: true, msg: 'Hobby not found' });
+            return res.status(404).json({ error: true, msg: 'Hobby not found' });
         }
-    
+
         res.json({
-          msg: 'Hobby updated successfully',
-          error: false,
-          data: updatedHobbies.rows[0],
+            msg: 'Hobby updated successfully',
+            error: false,
+            data: updatedHobbies.rows[0],
         });
-      } catch (error) {
+    } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-      }
+    }
 };
 
 const deletehobby = async (req, res) => {
@@ -130,7 +130,7 @@ const getHobbyById = async (req, res) => {
 };
 
 const getusersofhobby = async (req, res) => {
-    const { hobby_id } = req.body;
+    const { hobby_id, user_id } = req.body;
     const { page, limit } = req.query;
 
     if (!hobby_id) {
@@ -148,30 +148,53 @@ const getusersofhobby = async (req, res) => {
         }
 
         let usersData;
-        // Fetch users associated with the hobby_id with pagination and additional conditions
+        let query;
+        const params = [hobby_id];
+
+        if (user_id) {
+            // Check if the provided user ID exists in the Users table
+            const userCheckQuery = 'SELECT * FROM Users WHERE id = $1 LIMIT 1';
+            const userCheckResult = await pool.query(userCheckQuery, [user_id]);
+
+            if (userCheckResult.rows.length === 0) {
+                return res.status(404).json({ error: true, msg: 'User ID does not exist in the database' });
+            }
+
+            query = `
+          SELECT *,
+          ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
+          * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
+          * sin( radians( latitude ) ) ) ) AS distance,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE hobby = $1
+          AND id != $5 -- Exclude the provided user ID
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+
+            params.push(user_id, user_id, user_id, user_id);
+        } else {
+            query = `
+          SELECT *,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE hobby = $1
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+        }
+
         if (page && limit) {
             const offset = (page - 1) * limit;
-            const usersQuery = `
-                SELECT * FROM Users 
-                WHERE hobby = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false 
-                LIMIT $2 OFFSET $3
-            `;
-            const usersResult = await pool.query(usersQuery, [hobby_id, limit, offset]);
-            usersData = usersResult.rows;
-        } else {
-            const allUsersQuery = `
-                SELECT * FROM Users 
-                WHERE hobby = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false
-            `;
-            const allUsersResult = await pool.query(allUsersQuery, [hobby_id]);
-            usersData = allUsersResult.rows;
+            query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+            params.push(limit, offset);
         }
+
+        const usersResult = await pool.query(query, params);
+        usersData = usersResult.rows;
 
         // Fetch hobby details for the provided hobby_id
         const hobbyQuery = 'SELECT * FROM Hobbies WHERE id = $1';
@@ -180,7 +203,7 @@ const getusersofhobby = async (req, res) => {
 
         const response = {
             error: false,
-            count: totalCount,
+            count: usersData.length,
             users: usersData,
             hobby_details: hobbyData,
         };

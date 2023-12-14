@@ -152,22 +152,40 @@ const addpreferncerToUser = async (req, res) => {
 
 const getusersofrelationtype = async (req, res) => {
 
-  const { relation_type_id } = req.body;
+  const { relation_type_id, user_id } = req.body;
   const { page, limit } = req.query;
 
-  if (!relation_type_id) {
-    return res.status(400).json({ error: true, msg: 'Relation type ID is missing in the request body' });
+  if (!relation_type_id || !user_id) {
+    return res.status(400).json({ error: true, msg: 'Relation type ID or User ID is missing in the request body' });
+  }
+
+  // Check if the provided user ID exists in the Users table
+  const userCheckQuery = 'SELECT * FROM Users WHERE id = $1 LIMIT 1';
+  const userCheckResult = await pool.query(userCheckQuery, [user_id]);
+
+  if (userCheckResult.rows.length === 0) {
+    return res.status(404).json({ error: true, msg: 'User ID does not exist in the database' });
   }
 
   let query = `
-    SELECT * FROM Users WHERE relation_type = $1
+    SELECT *,
+    ( 6371 * acos( cos( radians($1) ) * cos( radians( latitude ) )
+    * cos( radians( longitude ) - radians($2) ) + sin( radians($3) )
+    * sin( radians( latitude ) ) ) ) AS distance,
+    EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+    FROM Users
+    WHERE relation_type = $4
+    AND id != $5 -- Exclude the provided user ID
+    AND report_status = false
+    AND deleted_status = false
+    AND block_status = false
   `;
 
-  const params = [relation_type_id];
+  const params = [user_id, user_id, user_id, relation_type_id, user_id];
 
   if (page && limit) {
     const offset = (page - 1) * limit;
-    query += ` OFFSET $2 LIMIT $3`;
+    query += ` OFFSET $6 LIMIT $7`;
     params.push(offset, limit);
   }
 
@@ -183,11 +201,11 @@ const getusersofrelationtype = async (req, res) => {
     // To get the count of users
     const countQuery = 'SELECT COUNT(*) FROM Users WHERE relation_type = $1';
     const countResult = await pool.query(countQuery, [relation_type_id]);
-    const totalCount = countResult.rows[0].count;
+    const totalCount = countResult.rows[0].length;
 
     const response = {
       error: false,
-      count: totalCount,
+      count: usersData.length,
       users: usersData,
     };
 

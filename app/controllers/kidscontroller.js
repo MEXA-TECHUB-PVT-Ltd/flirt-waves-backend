@@ -3,44 +3,44 @@ const pool = require("../config/dbconfig")
 const addkidsopinion = async (req, res) => {
     try {
         const { kids_opinion, image } = req.body; // Extract 'kids_opinion' and 'image' from request body
-    
+
         const newKids = await pool.query(
-          'INSERT INTO Kids (kids_opinion, image) VALUES ($1, $2) RETURNING *',
-          [kids_opinion, image] // Include both 'kids_opinion' and 'image' in the query parameters
+            'INSERT INTO Kids (kids_opinion, image) VALUES ($1, $2) RETURNING *',
+            [kids_opinion, image] // Include both 'kids_opinion' and 'image' in the query parameters
         );
-    
+
         res.json({
-          msg: 'Kids opinion added successfully',
-          error: false,
-          data: newKids.rows[0],
+            msg: 'Kids opinion added successfully',
+            error: false,
+            data: newKids.rows[0],
         });
-      } catch (error) {
+    } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-      }
+    }
 };
 
 const updatekidsopinion = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
         const { kids_opinion, image } = req.body; // Extract 'kids_opinion' and 'image' from request body
-    
+
         const updatedKids = await pool.query(
-          'UPDATE Kids SET kids_opinion = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
-          [kids_opinion, image, id] // Include 'kids_opinion', 'image', and 'id' in the query parameters
+            'UPDATE Kids SET kids_opinion = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+            [kids_opinion, image, id] // Include 'kids_opinion', 'image', and 'id' in the query parameters
         );
-    
+
         if (updatedKids.rows.length === 0) {
-          return res.status(404).json({ error: true, msg: 'Kid opinion not found' });
+            return res.status(404).json({ error: true, msg: 'Kid opinion not found' });
         }
-    
+
         res.json({
-          msg: 'Kid opinion updated successfully',
-          error: false,
-          data: updatedKids.rows[0],
+            msg: 'Kid opinion updated successfully',
+            error: false,
+            data: updatedKids.rows[0],
         });
-      } catch (error) {
+    } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-      }
+    }
 };
 
 const deletekidsopinion = async (req, res) => {
@@ -130,7 +130,7 @@ const getKidopinionByID = async (req, res) => {
 };
 
 const getusersofkidopinion = async (req, res) => {
-    const { kids_id } = req.body;
+    const { kids_id, user_id } = req.body;
     const { page, limit } = req.query;
 
     if (!kids_id) {
@@ -148,30 +148,53 @@ const getusersofkidopinion = async (req, res) => {
         }
 
         let usersData;
-        // Fetch users associated with the kids_id with pagination and additional conditions
+        let query;
+        const params = [kids_id];
+
+        if (user_id) {
+            // Check if the provided user ID exists in the Users table
+            const userCheckQuery = 'SELECT * FROM Users WHERE id = $1 LIMIT 1';
+            const userCheckResult = await pool.query(userCheckQuery, [user_id]);
+
+            if (userCheckResult.rows.length === 0) {
+                return res.status(404).json({ error: true, msg: 'User ID does not exist in the database' });
+            }
+
+            query = `
+          SELECT *,
+          ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
+          * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
+          * sin( radians( latitude ) ) ) ) AS distance,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE kids_opinion = $1
+          AND id != $5 -- Exclude the provided user ID
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+
+            params.push(user_id, user_id, user_id, user_id);
+        } else {
+            query = `
+          SELECT *,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE kids_opinion = $1
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+        }
+
         if (page && limit) {
             const offset = (page - 1) * limit;
-            const usersQuery = `
-                SELECT * FROM Users 
-                WHERE kids_opinion = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false 
-                LIMIT $2 OFFSET $3
-            `;
-            const usersResult = await pool.query(usersQuery, [kids_id, limit, offset]);
-            usersData = usersResult.rows;
-        } else {
-            const allUsersQuery = `
-                SELECT * FROM Users 
-                WHERE kids_opinion = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false
-            `;
-            const allUsersResult = await pool.query(allUsersQuery, [kids_id]);
-            usersData = allUsersResult.rows;
+            query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+            params.push(limit, offset);
         }
+
+        const usersResult = await pool.query(query, params);
+        usersData = usersResult.rows;
 
         // Fetch kids opinion details for the provided kids_id
         const kidsQuery = 'SELECT * FROM Kids WHERE id = $1';
@@ -180,7 +203,7 @@ const getusersofkidopinion = async (req, res) => {
 
         const response = {
             error: false,
-            count: totalCount,
+            count: usersData.length,
             users: usersData,
             kids_opinion_details: kidsData,
         };

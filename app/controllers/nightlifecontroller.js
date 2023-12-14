@@ -3,44 +3,44 @@ const pool = require("../config/dbconfig")
 const addnightlife = async (req, res) => {
     try {
         const { night_life, image } = req.body; // Extract 'night_life' and 'image' from request body
-    
+
         const newNightlife = await pool.query(
-          'INSERT INTO Nightlife (night_life, image) VALUES ($1, $2) RETURNING *',
-          [night_life, image] // Include both 'night_life' and 'image' in the query parameters
+            'INSERT INTO Nightlife (night_life, image) VALUES ($1, $2) RETURNING *',
+            [night_life, image] // Include both 'night_life' and 'image' in the query parameters
         );
-    
+
         res.json({
-          msg: 'Night life added successfully',
-          error: false,
-          data: newNightlife.rows[0],
+            msg: 'Night life added successfully',
+            error: false,
+            data: newNightlife.rows[0],
         });
-      } catch (error) {
+    } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-      }
+    }
 };
 
 const updatenightlife = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
         const { night_life, image } = req.body; // Extract 'night_life' and 'image' from request body
-    
+
         const updatedNightlife = await pool.query(
-          'UPDATE Nightlife SET night_life = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
-          [night_life, image, id] // Include 'night_life', 'image', and 'id' in the query parameters
+            'UPDATE Nightlife SET night_life = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+            [night_life, image, id] // Include 'night_life', 'image', and 'id' in the query parameters
         );
-    
+
         if (updatedNightlife.rows.length === 0) {
-          return res.status(404).json({ error: true, msg: 'Night life not found' });
+            return res.status(404).json({ error: true, msg: 'Night life not found' });
         }
-    
+
         res.json({
-          msg: 'Night life updated successfully',
-          error: false,
-          data: updatedNightlife.rows[0],
+            msg: 'Night life updated successfully',
+            error: false,
+            data: updatedNightlife.rows[0],
         });
-      } catch (error) {
+    } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-      }
+    }
 };
 
 const deletenightlife = async (req, res) => {
@@ -130,7 +130,7 @@ const getNightlifeByID = async (req, res) => {
 };
 
 const getusersofnightlifeopinion = async (req, res) => {
-    const { nightlife_id } = req.body;
+    const { nightlife_id, user_id } = req.body;
     const { page, limit } = req.query;
 
     if (!nightlife_id) {
@@ -148,30 +148,53 @@ const getusersofnightlifeopinion = async (req, res) => {
         }
 
         let usersData;
-        // Fetch users associated with the nightlife_id with pagination and additional conditions
+        let query;
+        const params = [nightlife_id];
+
+        if (user_id) {
+            // Check if the provided user ID exists in the Users table
+            const userCheckQuery = 'SELECT * FROM Users WHERE id = $1 LIMIT 1';
+            const userCheckResult = await pool.query(userCheckQuery, [user_id]);
+
+            if (userCheckResult.rows.length === 0) {
+                return res.status(404).json({ error: true, msg: 'User ID does not exist in the database' });
+            }
+
+            query = `
+          SELECT *,
+          ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
+          * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
+          * sin( radians( latitude ) ) ) ) AS distance,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE night_life = $1
+          AND id != $5 -- Exclude the provided user ID
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+
+            params.push(user_id, user_id, user_id, user_id);
+        } else {
+            query = `
+          SELECT *,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE night_life = $1
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+        }
+
         if (page && limit) {
             const offset = (page - 1) * limit;
-            const usersQuery = `
-                SELECT * FROM Users 
-                WHERE night_life = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false 
-                LIMIT $2 OFFSET $3
-            `;
-            const usersResult = await pool.query(usersQuery, [nightlife_id, limit, offset]);
-            usersData = usersResult.rows;
-        } else {
-            const allUsersQuery = `
-                SELECT * FROM Users 
-                WHERE night_life = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false
-            `;
-            const allUsersResult = await pool.query(allUsersQuery, [nightlife_id]);
-            usersData = allUsersResult.rows;
+            query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+            params.push(limit, offset);
         }
+
+        const usersResult = await pool.query(query, params);
+        usersData = usersResult.rows;
 
         // Fetch nightlife opinion details for the provided nightlife_id
         const nightlifeQuery = 'SELECT * FROM Nightlife WHERE id = $1';
@@ -180,7 +203,7 @@ const getusersofnightlifeopinion = async (req, res) => {
 
         const response = {
             error: false,
-            count: totalCount,
+            count: usersData.length,
             users: usersData,
             nightlife_opinion_details: nightlifeData,
         };
