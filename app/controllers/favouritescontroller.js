@@ -250,75 +250,35 @@ const removeFavorite = async (req, res) => {
 };
 
 const checkFavoriteStatus = async (req, res) => {
+
     const { user_id, favorite_user_id } = req.body;
 
-    if (!user_id || !favorite_user_id) {
-        return res.status(400).json({ error: true, msg: 'User ID and Favorite user ID are required' });
+    try {
+        // Check if both user_id and favorite_user_id exist in the Users table
+        const userExistsQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userQueryValues = [user_id, favorite_user_id];
+
+        const [userDetails, favoriteUserDetails] = await Promise.all(
+            userQueryValues.map(async (id) => {
+                const result = await pool.query(userExistsQuery, [id]);
+                return result.rows.length > 0 ? result.rows[0] : null;
+            })
+        );
+
+        const userExists = !!userDetails;
+        const favoriteUserExists = !!favoriteUserDetails;
+
+        const savedStatus = userExists && favoriteUserExists;
+
+        res.status(200).json({
+            savedStatus,
+            user: userDetails,
+            favoriteUser: favoriteUserDetails
+        });
+    } catch (error) {
+        console.error('Error checking saved status:', error);
+        res.status(500).json({ error: true, msg: 'Internal Server Error' });
     }
-
-    const checkExistingQuery = `
-        SELECT * FROM Favorites
-        WHERE user_id = $1 AND favorite_user_id = $2
-    `;
-
-    const userDetailsQuery = `
-    SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-    u.deleted_status, u.block_status, u.height, u.location, u.gender, u.dob, u.latitude, u.longitude, u.verified_status, u.report_status,
-    u.deleted_at, u.created_at, u.updated_at, u.last_active,
-    g.gender AS interested_in_data,
-    r.relation_type AS relation_type_data,
-    c.cooking_skill AS cooking_skill_data,
-    h.habit AS habit_data,
-    e.exercise AS exercise_data,
-    hb.hobby AS hobby_data,
-    s.smoking_opinion AS smoking_opinion_data,
-    k.kids_opinion AS kids_opinion_data,
-    n.night_life AS night_life_data
-    FROM Users u
-    LEFT JOIN Gender g ON CAST(u.interested_in AS INTEGER) = g.id
-    LEFT JOIN Relationship r ON CAST(u.relation_type AS INTEGER) = r.id
-    LEFT JOIN Cookingskill c ON CAST(u.cooking_skill AS INTEGER) = c.id
-    LEFT JOIN Habits h ON CAST(u.habit AS INTEGER) = h.id
-    LEFT JOIN Exercise e ON CAST(u.exercise AS INTEGER) = e.id
-    LEFT JOIN Hobbies hb ON CAST(u.hobby AS INTEGER) = hb.id
-    LEFT JOIN Smoking s ON CAST(u.smoking_opinion AS INTEGER) = s.id
-    LEFT JOIN Kids k ON CAST(u.kids_opinion AS INTEGER) = k.id
-    LEFT JOIN Nightlife n ON CAST(u.night_life AS INTEGER) = n.id
-    WHERE u.id IN ($1, $2)
-    AND u.block_status = false -- Add this condition to exclude users with block_status = true
-    `;
-
-    pool.query(checkExistingQuery, [user_id, favorite_user_id], async (err, result) => {
-        if (err) {
-            console.error('Error checking favorite status:', err);
-            return res.status(500).json({ saved_status: false, error: true });
-        }
-
-        const favoriteStatus = result.rows.length > 0;
-
-        // Fetch user and favorite user details
-        try {
-            const userDetailsResult = await pool.query(userDetailsQuery, [user_id, favorite_user_id]);
-            const userDetails = userDetailsResult.rows;
-
-            if (userDetails.length !== 2) {
-                return res.status(404).json({ error: true, msg: 'User or favorite user details not found' });
-            }
-
-            const [user, favoriteUser] = userDetails;
-
-            res.status(200).json({
-                saved_status: favoriteStatus,
-                error: false,
-                message: favoriteStatus ? 'Favorite found for the user' : 'Favorite not found for the user',
-                user_details: user,
-                favorite_user_details: favoriteUser,
-            });
-        } catch (error) {
-            console.error('Error fetching user details:', error);
-            res.status(500).json({ error: true, msg: 'Internal Server Error' });
-        }
-    });
 }
 
 const getUsersWithSameFavorites = async (req, res) => {
@@ -348,44 +308,40 @@ const getUsersWithSameFavorites = async (req, res) => {
         hb.hobby AS hobby_data,
         s.smoking_opinion AS smoking_opinion_data,
         k.kids_opinion AS kids_opinion_data,
-        n.night_life AS night_life_data,
-        ( 6371 * acos( cos( radians($1) ) * cos( radians( u.latitude ) )
-        * cos( radians( u.longitude ) - radians($2) ) + sin( radians($3) )
-        * sin( radians( u.latitude ) ) ) ) AS distance,
-        EXTRACT(YEAR FROM AGE(TO_DATE(u.dob, 'YYYY-MM-DD'))) AS age
-        FROM Users u
-        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-        INNER JOIN Favorites f ON u.id = f.user_id
-        WHERE f.favorite_user_id = $4
-        AND u.id != $5 -- Exclude the provided user ID
+        n.night_life AS night_life_data
+    FROM Users u
+    LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+    LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+    LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+    LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+    LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+    LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+    LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+    LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+    LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+    INNER JOIN Favorites f ON u.id = f.user_id
+    WHERE f.favorite_user_id = $1
         AND u.deleted_status = false
         AND u.block_status = false
         AND u.report_status = false
-        ORDER BY u.id
-        OFFSET $6
-        LIMIT $7
+    ORDER BY u.id
+    OFFSET $2
+    LIMIT $3
         `;
 
-        const favoriteUsersResult = await pool.query(favoriteUsersQuery, [user_id, user_id, user_id, user_id, user_id, offset, limit]);
+        const favoriteUsersResult = await pool.query(favoriteUsersQuery, [user_id, offset, limit]);
         const favoriteUsers = favoriteUsersResult.rows;
 
         // Get total count of users who have added the provided user to their favorites
-        const totalCountQuery = 'SELECT COUNT(*) AS total_count FROM Users u INNER JOIN Favorites f ON u.id = f.user_id WHERE f.favorite_user_id = $1 AND u.deleted_status = false AND u.block_status = false AND u.report_status = false';
+        const totalCountQuery = 'SELECT COUNT(*) AS total_count FROM Users u INNER JOIN Favorites f ON u.id = f.user_id WHERE f.favorite_user_id = $1';
         const totalCountResult = await pool.query(totalCountQuery, [user_id]);
         const totalCount = parseInt(totalCountResult.rows[0].total_count);
 
         res.status(200).json({
             error: false,
             msg: 'Favorite users retrieved successfully',
-            total_count: totalCount,
+            // count: favoriteUsers.length,
+            total_count: favoriteUsers.length,
             data: favoriteUsers,
         });
     } catch (error) {
