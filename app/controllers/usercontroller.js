@@ -67,6 +67,126 @@ const usersignup = async (req, res) => {
         );
 
         const userId = result.rows[0];
+
+        const mailOptions = {
+            from: 'mahreentassawar@gmail.com',
+            to: email,
+            subject: 'Registration Successfull', 
+            html: `
+            <html>
+            <head>
+                <style>
+                    /* Add your CSS styles for the email template here */
+                    body {
+                        font-family: Arial, sans-serif;
+                        background-color: #f4f4f4;
+                        color: #333;
+                        margin: 0;
+                        padding: 0;
+                    }
+                    .header {
+                        background-color: #E3B12F; /* Yellow background color */
+                        padding: 10px;
+                        text-align: center;
+                        border-radius: 5px;
+                    }
+                    .logo-container {
+                        display: flex;
+                        justify-content: center;
+                        align-items: center;
+                        align-content:center;
+                        margin-bottom: 10px;
+                    }
+                    .logo {
+                        margin-top:-40vh;
+                        display: inline-block;
+                        margin: 0 5px; /* Adjust spacing between icons */
+                        max-width: 50px; /* Adjust size as needed */
+                    }
+                    .flirt-waves {
+                        font-size: 20px;
+                        color: black;
+                        margin: 0; /* Remove default margins */
+                    }
+                    .container {
+                        max-width: 700px;
+                        margin: 0 auto;
+                        padding: 20px;
+                        background-color: #fff;
+                        border-radius: 8px;
+                        box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+                        text-align: center;
+                    }
+                    .centered-image {
+                        display: inline-block;
+                        margin: 0 5px; /* Adjust spacing between icons */
+                        max-width: 20px; /* Adjust size as needed */
+                    }
+                    .otp {
+                        background-color: #FFEEB6; /* Yellow background color */
+                        padding: 10px;
+                        width: 300px;
+                        font-size: 24px;
+                        text-align: center;
+                        margin-top: 40px;
+                        margin-bottom: 20px;
+                        letter-spacing: 5px;
+                        border-radius: 50px;
+                        color: #F5BF03;
+                    }
+                    /* Add more styles as needed */
+                </style>
+            </head>
+            <body>
+
+                <div class="container">
+
+                <img class="logo" src="${logo}" alt="Logo"> 
+
+                    <!-- Second Image -->
+                    <img src="${imagePath}" alt="Embedded Image" style="width: 100%;margin-top:20px; height:100px">
+                    <!-- Rest of your email content -->
+                    <p style="color: black; text-align: left; font-weight:600px; margin: 15px 0;">Hey,</p>
+                    <p style="color: #606060; text-align: left; margin: 15px 0;">
+                    Welcome to GT-Signals – the ultimate platform for seamless and intelligent trading. We're thrilled to have you on board, and we can't wait for you to experience the power of smart investing right at your fingertips.</p>
+
+                    <p style="color: #606060; text-align: left; margin: 15px 0;">
+                    To get started, simply log in to your account using the credentials you provided during registration. If you have any questions or need assistance, feel free to reach out to our support team at  <span style="color: #E3B12F;" >GT-Signal@email.com</span>
+                    </p>
+
+                    <p style="color: #606060; text-align: left; margin: 15px 0;">
+                    Thank you for choosing GT-Signals. We're excited to be part of your trading journey, and we look forward to helping you achieve your financial goals.
+                    Happy trading!
+                    </p>
+
+                    <div class="header"> 
+                    <p style="color: black; text-align: center; font-weight:boldest; font-size:20px;">
+                        Get In Touch!
+                    </p>
+                    <a href="https://www.facebook.com/link-to-facebook" target="_blank">
+                        <img src="${fb}" alt="Facebook" class="centered-image">
+                    </a>
+                    <a href="https://www.instagram.com/link-to-instagram" target="_blank">
+                        <img src="${insta}" alt="Instagram" class="centered-image">
+                    </a>
+                    <a href="https://www.twitter.com/link-to-twitter" target="_blank">
+                        <img src="${twitter}" alt="Twitter" class="centered-image">  
+                    </a>
+
+                    <!-- Add a copyright symbol -->
+                    <p style="color: black; text-align: center; font-weight:boldest; font-size:13px;">
+                        &#169; 2023 GT-Signal. All right reserved
+                    </p>
+                </div>
+
+                </div>
+            </body>
+            </html>
+        `,
+        };
+
+        await transporter.sendMail(mailOptions);
+
         res.status(201).json({ error: false, msg: 'User signed up successfully', data: userId });
     } catch (error) {
         console.error(error);
@@ -480,27 +600,25 @@ const forgetpassword = async (req, res) => {
                         background-color: #f4f4f4;
                         color: #333;
                         margin: 0;
-                        padding: 0;
+                        padding: 0; 
                     }
                     .header {
                         background-color: #FFEEB6; /* Yellow background color */
                         padding: 20px;
                         text-align: center;
-                        border-radius: 5px;
+                        border-radius: 5px;  
+                        /* Add height if needed */
                     }
                     .logo-container {
-                        display: flex;
-                        justify-content: center;
-                        align-items: center;
-                        align-content:center;
-                        margin-bottom: 10px;
+                        
                     }
-                    .logo {
+                    .logo { 
                         max-width: 50px; /* Adjust size as needed */
                         margin-right: 10px; /* Space between logo and text */
                     }
-                    .flirt-waves {
-                        font-size: 24px;
+                    .flirt-waves { 
+                        font-weight:bold;
+                        font-size: 20px;
                         color: black;
                         margin: 0; /* Remove default margins */
                     }
@@ -534,25 +652,32 @@ const forgetpassword = async (req, res) => {
                 </style>
             </head>
             <body>
-                <div class="header">
-                    <div class="logo-container">
-                   
-                    <img class="logo" src="${logo}" alt="Logo">
-                    <p class="flirt-waves">Flirt Waves</p>
-                   
-                    </div>
-                </div>
+            
                 <div class="container">
+
+                <div class="header">
+                <div class="logo-container">
+                    <img class="logo" src="${logo}" alt="Logo">
+                    <p class="flirt-waves">Flirt Waves</p> 
+                </div>
+            </div>
+            
                     <!-- Second Image -->
                     <img src="${imagePath}" alt="Embedded Image" style="width: 150px;">
                     <!-- Rest of your email content -->
-                    <p style="color: #606060; margin: 15px 0;">Great choice on joining Flirt Waves! To get the most out of your experience, please verify your email by clicking the link below:</p>
+                    <p style="color: #606060; margin: 15px 0;">Great choice on joining Flirt Waves! To get the most out of your experience, please verify your email by using verification code provided below:</p>
                     <strong class="otp">${otp}</strong>            
                     <p style="color: #606060; margin: 15px 0;">No worries if you didn't request this - just ignore the email, and your account <br/> will stay inactive.<br/>Looking forward to having you on board!</p>
                     <div style="text-align: center;">
-                        <img src="${fb}" alt="Facebook" class="centered-image">
-                        <img src="${insta}" alt="Instagram" class="centered-image">
-                        <img src="${twitter}" alt="Twitter" class="centered-image">
+                    <a href="https://www.facebook.com/link-to-facebook" target="_blank">
+                    <img src="${fb}" alt="Facebook" class="centered-image">
+                    </a>
+                    <a href="https://www.instagram.com/link-to-instagram" target="_blank">
+                    <img src="${insta}" alt="Instagram" class="centered-image">
+                    </a>
+                   <a href="https://www.twitter.com/link-to-twitter" target="_blank">
+                    <img src="${twitter}" alt="Twitter" class="centered-image">  
+                   </a>
                     </div>
                 </div>
             </body>
