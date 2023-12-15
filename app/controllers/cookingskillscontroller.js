@@ -118,19 +118,20 @@ const getusersofcookingskill = async (req, res) => {
     }
   
     let query = `
-      SELECT *,
-      ( 6371 * acos( cos( radians($1) ) * cos( radians( latitude ) )
-      * cos( radians( longitude ) - radians($2) ) + sin( radians($3) )
-      * sin( radians( latitude ) ) ) ) AS distance,
-      EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
-      FROM Users
-      WHERE cooking_skill = $4
-      AND deleted_status = false
-      AND block_status = false
-      AND report_status = false
-    `;
+    SELECT *,
+    ( 6371 * acos( cos( radians($1) ) * cos( radians( latitude ) )
+    * cos( radians( longitude ) - radians($2) ) + sin( radians($3) )
+    * sin( radians( latitude ) ) ) ) AS distance,
+    EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+    FROM Users
+    WHERE cooking_skill = $4
+    AND deleted_status = false
+    AND block_status = false
+    AND report_status = false
+    AND id != ${user_id}
+  `;
   
-    const params = [user_id, user_id, user_id, cooking_skill_id];
+  const params = [user_id, user_id, user_id, cooking_skill_id];
   
     if (page && limit) {
       const offset = (page - 1) * limit;
@@ -148,7 +149,7 @@ const getusersofcookingskill = async (req, res) => {
   
       const response = {
         error: false,
-        count: totalCount,
+        count: userData.length,
         users: userData,
       };
   

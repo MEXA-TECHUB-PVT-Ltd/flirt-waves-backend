@@ -816,12 +816,36 @@ function calculateDistance(lat1, lon1, lat2, lon2) {
     return distance;
 }
 
-const getUsersWithFilters = async (req, res) => {
+function calculateAge(dateOfBirth) {
+    const dob = new Date(dateOfBirth);
+    const today = new Date();
+    let age = today.getFullYear() - dob.getFullYear();
+    const monthDiff = today.getMonth() - dob.getMonth();
 
+    if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < dob.getDate())) {
+        age--;
+    }
+
+    return age;
+}
+
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * (Math.PI / 180); // deg2rad below
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+        0.5 -
+        Math.cos(dLat) / 2 +
+        (Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * (1 - Math.cos(dLon))) / 2;
+
+    return R * 2 * Math.asin(Math.sqrt(a)); // Distance in kilometers
+}
+
+const getUsersWithFilters = async (req, res) => {
 
     const { page, limit } = req.query;
     const { userId } = req.params;
-    const { gender, online_status, location, age, distance, relation_type_id, interested_in_id, habit_id } = req.body;
+    const { gender, online_status, location, minAge, maxAge, distance, relation_type_id, interested_in_id, habit_id, exercise_id, cooking_skill_id, hobby_id, night_life_id, smoking_opinion_id, kids_opinion_id } = req.body;
 
     let query = `
         SELECT * FROM Users
@@ -848,12 +872,14 @@ const getUsersWithFilters = async (req, res) => {
         queryParams.push(location);
     }
 
-    if (age !== undefined) {
+    if (minAge !== undefined && maxAge !== undefined) {
         const currentYear = new Date().getFullYear();
-        const birthYear = currentYear - age;
+        const minBirthYear = currentYear - maxAge;
+        const maxBirthYear = currentYear - minAge;
 
-        query += ' AND EXTRACT(YEAR FROM dob::DATE) = $' + (queryParams.length + 1);
-        queryParams.push(birthYear);
+        query += ' AND EXTRACT(YEAR FROM dob::DATE) BETWEEN $' + (queryParams.length + 1) + ' AND $' + (queryParams.length + 2);
+        queryParams.push(minBirthYear);
+        queryParams.push(maxBirthYear);
     }
 
     if (relation_type_id !== undefined) {
@@ -869,6 +895,36 @@ const getUsersWithFilters = async (req, res) => {
     if (habit_id !== undefined) {
         query += ' AND habit = $' + (queryParams.length + 1);
         queryParams.push(habit_id);
+    }
+
+    if (exercise_id !== undefined) {
+        query += ' AND exercise = $' + (queryParams.length + 1);
+        queryParams.push(exercise_id);
+    }
+
+    if (cooking_skill_id !== undefined) {
+        query += ' AND cooking_skill = $' + (queryParams.length + 1);
+        queryParams.push(cooking_skill_id);
+    }
+
+    if (hobby_id !== undefined) {
+        query += ' AND hobby = $' + (queryParams.length + 1);
+        queryParams.push(hobby_id);
+    }
+
+    if (night_life_id !== undefined) {
+        query += ' AND night_life = $' + (queryParams.length + 1);
+        queryParams.push(night_life_id);
+    }
+
+    if (smoking_opinion_id !== undefined) {
+        query += ' AND smoking_opinion = $' + (queryParams.length + 1);
+        queryParams.push(smoking_opinion_id);
+    }
+
+    if (kids_opinion_id !== undefined) {
+        query += ' AND kids_opinion = $' + (queryParams.length + 1);
+        queryParams.push(kids_opinion_id);
     }
 
     try {
@@ -893,22 +949,27 @@ const getUsersWithFilters = async (req, res) => {
         const fetchUsersResult = await pool.query(fetchUsersQuery, queryParams);
         const countResult = await pool.query(countQuery, queryParams);
 
-        const users = fetchUsersResult.rows;
+        const users = fetchUsersResult.rows.map(user => {
+            const userAge = calculateAge(user.dob); // Implement calculateAge function accordingly
+            const userDistance = calculateDistance(
+                parseFloat(userLatitude),
+                parseFloat(userLongitude),
+                parseFloat(user.latitude),
+                parseFloat(user.longitude)
+            );
+
+            return {
+                ...user,
+                age: userAge,
+                distance: userDistance
+            };
+        });
+
         const count = parseInt(countResult.rows[0].count);
 
         if (distance !== undefined) {
-            // Filter users based on the provided distance
-            const filteredUsers = users.filter(user => {
-                const userDist = calculateDistance(
-                    parseFloat(userLatitude),
-                    parseFloat(userLongitude),
-                    parseFloat(user.latitude),
-                    parseFloat(user.longitude)
-                );
-                return userDist <= distance;
-            });
-
-            return res.json({ error: false, count, users: filteredUsers });
+            const filteredUsers = users.filter(user => user.distance <= distance);
+            return res.json({ error: false, count: filteredUsers.length, users: filteredUsers });
         }
 
         return res.json({ error: false, count, users });
@@ -916,91 +977,6 @@ const getUsersWithFilters = async (req, res) => {
         console.error('Error occurred:', error);
         return res.status(500).json({ error: true, msg: 'Something went wrong' });
     }
-
-    // try {
-    //     const { userId } = req.params;
-    //     const { gender, online_status, location, age, distance, relation_type_id, interested_in_id, habit_id } = req.body;
-
-    //     // Fetch latitude and longitude of the user specified in params
-    //     const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
-    //     const userExistResult = await pool.query(userExistQuery, [userId]);
-
-    //     if (userExistResult.rows.length === 0) {
-    //         return res.status(404).json({ error: 'User not found' });
-    //     }
-
-    //     const userLatitude = userExistResult.rows[0].latitude;
-    //     const userLongitude = userExistResult.rows[0].longitude;
-
-    //     let fetchUsersQuery = `
-    //         SELECT * FROM Users
-    //         WHERE id <> $1
-    //         AND block_status = false
-    //         AND report_status = false
-    //         AND deleted_status = false
-    //     `;
-
-    //     const queryParams = [userId];
-
-    //     if (gender !== undefined) {
-    //         fetchUsersQuery += ' AND gender = $' + (queryParams.length + 1);
-    //         queryParams.push(gender);
-    //     }
-
-    // if (online_status !== undefined) {
-    //     fetchUsersQuery += ' AND online_status = $' + (queryParams.length + 1);
-    //     queryParams.push(online_status);
-    // }
-
-    // if (location !== undefined) {
-    //     fetchUsersQuery += ' AND location = $' + (queryParams.length + 1);
-    //     queryParams.push(location);
-    // }
-
-    // if (age !== undefined) {
-    //     const currentYear = new Date().getFullYear();
-    //     const birthYear = currentYear - age;
-
-    //     fetchUsersQuery += ' AND EXTRACT(YEAR FROM dob::DATE) = $' + (queryParams.length + 1);
-    //     queryParams.push(birthYear);
-    // }
-
-    // if (relation_type_id !== undefined) {
-    //     fetchUsersQuery += ' AND relation_type = $' + (queryParams.length + 1);
-    //     queryParams.push(relation_type_id);
-    // }
-
-    // if (interested_in_id !== undefined) {
-    //     fetchUsersQuery += ' AND interested_in = $' + (queryParams.length + 1);
-    //     queryParams.push(interested_in_id);
-    // }
-
-    // if (habit_id !== undefined) {
-    //     fetchUsersQuery += ' AND habit = $' + (queryParams.length + 1);
-    //     queryParams.push(habit_id);
-    // }
-
-    //     const fetchUsersResult = await pool.query(fetchUsersQuery, queryParams);
-    //     let users = fetchUsersResult.rows;
-
-    //     if (distance !== undefined) {
-    //         // Filter users based on the provided distance
-    //         users = users.filter(user => {
-    //             const userDist = calculateDistance(
-    //                 parseFloat(userLatitude),
-    //                 parseFloat(userLongitude),
-    //                 parseFloat(user.latitude),
-    //                 parseFloat(user.longitude)
-    //             );
-    //             return userDist <= distance;
-    //         });
-    //     }
-
-    //     res.json({ users });
-    // } catch (error) {
-    //     console.error('Error occurred:', error);
-    //     res.status(500).json({ error: 'Something went wrong' });
-    // }
 
 };
 

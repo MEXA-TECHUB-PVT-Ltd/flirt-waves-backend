@@ -179,6 +179,7 @@ const getusersofrelationtype = async (req, res) => {
     AND report_status = false
     AND deleted_status = false
     AND block_status = false
+    AND id != ${user_id}
   `;
 
   const params = [user_id, user_id, user_id, relation_type_id, user_id];

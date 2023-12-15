@@ -111,7 +111,13 @@ const getusersofhabit = async (req, res) => {
 
     try {
         // Check if there are users associated with the habit_id
-        const usersExistQuery = 'SELECT COUNT(*) FROM Users WHERE habit = $1 AND deleted_status = false AND block_status = false AND report_status = false';
+        const usersExistQuery = `
+        SELECT COUNT(*)
+        FROM Users WHERE habit = $1 
+        AND deleted_status = false 
+        AND block_status = false 
+        AND report_status = false  
+        `;
         const usersExistResult = await pool.query(usersExistQuery, [habit_id]);
         const totalCount = parseInt(usersExistResult.rows[0].count);
 
@@ -154,6 +160,7 @@ const getusersofhabit = async (req, res) => {
           AND deleted_status = false
           AND block_status = false
           AND report_status = false
+          AND id != ${user_id}
         `;
 
             params.push(user_id, user_id, user_id, user_id);
@@ -166,6 +173,7 @@ const getusersofhabit = async (req, res) => {
           AND deleted_status = false
           AND block_status = false
           AND report_status = false
+          AND id != ${user_id}
         `;
         }
 
