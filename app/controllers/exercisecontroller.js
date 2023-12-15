@@ -142,6 +142,7 @@ const getusersofexercise = async (req, res) => {
           AND report_status = false
           AND block_status = false
           AND deleted_status = false
+          AND id != ${user_id}
         `;
 
             params.push(user_id, user_id, user_id, user_id);
@@ -154,6 +155,7 @@ const getusersofexercise = async (req, res) => {
           AND report_status = false
           AND block_status = false
           AND deleted_status = false
+          AND id != ${user_id}
         `;
         }
 
