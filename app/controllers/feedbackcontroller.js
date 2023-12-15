@@ -274,29 +274,52 @@ const getAllFeedbacks = async (req, res) => {
         const totalCount = parseInt(feedbackCountResult.rows[0].count);
 
         let feedbackData;
-        // Fetch all feedbacks with pagination
+        // Fetch all feedbacks with pagination along with user details
         if (page && limit) {
             const offset = (page - 1) * limit;
             const feedbackQuery = `
-                SELECT * FROM Feedback 
-                ORDER BY created_at DESC 
+                SELECT Feedback.*, Users.* FROM Feedback 
+                LEFT JOIN Users ON Feedback.user_id = Users.id
+                ORDER BY Feedback.created_at DESC 
                 LIMIT $1 OFFSET $2
             `;
             const feedbackResult = await pool.query(feedbackQuery, [limit, offset]);
             feedbackData = feedbackResult.rows;
         } else {
             const allFeedbackQuery = `
-                SELECT * FROM Feedback 
-                ORDER BY created_at DESC
+                SELECT Feedback.*, Users.* FROM Feedback 
+                LEFT JOIN Users ON Feedback.user_id = Users.id
+                ORDER BY Feedback.created_at DESC
             `;
             const allFeedbackResult = await pool.query(allFeedbackQuery);
             feedbackData = allFeedbackResult.rows;
         }
 
+        // Group feedbacks by user ID
+        const userFeedbacks = {};
+        feedbackData.forEach((feedback) => {
+            const { id, name,email ,images,gender,dob/* other user details */ } = feedback;
+            if (!userFeedbacks[id]) {
+                userFeedbacks[id] = {
+                    userDetails: { id, name ,email,images,gender,dob/* other user details */ },
+                    userFeedbacks: [feedback], // Initialize with the first feedback
+                };
+            } else {
+                userFeedbacks[id].userFeedbacks.push(feedback); // Add feedback to existing user
+            }
+        });
+
+        // Convert object of user feedbacks into an array
+        const formattedFeedbacks = Object.values(userFeedbacks)
+            .map(({ userDetails, userFeedbacks }) => ({
+                ...userDetails,
+                userFeedbacks,
+            }));
+
         res.status(200).json({
             error: false,
             count: totalCount,
-            feedbacks: feedbackData,
+            feedbacks: formattedFeedbacks,
         });
     } catch (error) {
         console.error('Error fetching feedbacks:', error);
