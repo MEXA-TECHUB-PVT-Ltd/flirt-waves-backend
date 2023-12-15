@@ -803,80 +803,204 @@ const blockUser = async (req, res) => {
     }
 };
 
+function calculateDistance(lat1, lon1, lat2, lon2) {
+    const R = 6371; // Radius of the Earth in kilometers
+    const dLat = (lat2 - lat1) * (Math.PI / 180);
+    const dLon = (lon2 - lon1) * (Math.PI / 180);
+    const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distance = R * c; // Distance in kilometers
+    return distance;
+}
+
 const getUsersWithFilters = async (req, res) => {
 
-    const { id } = req.params;
-    const { name, interested_in, relation_type, cooking_skill, exercise } = req.body;
+
+    const { page, limit } = req.query;
+    const { userId } = req.params;
+    const { gender, online_status, location, age, distance, relation_type_id, interested_in_id, habit_id } = req.body;
+
+    let query = `
+        SELECT * FROM Users
+        WHERE id <> $1
+        AND block_status = false
+        AND report_status = false
+        AND deleted_status = false
+    `;
+
+    const queryParams = [userId];
+
+    if (gender !== undefined) {
+        query += ' AND gender = $' + (queryParams.length + 1);
+        queryParams.push(gender);
+    }
+
+    if (online_status !== undefined) {
+        query += ' AND online_status = $' + (queryParams.length + 1);
+        queryParams.push(online_status);
+    }
+
+    if (location !== undefined) {
+        query += ' AND location = $' + (queryParams.length + 1);
+        queryParams.push(location);
+    }
+
+    if (age !== undefined) {
+        const currentYear = new Date().getFullYear();
+        const birthYear = currentYear - age;
+
+        query += ' AND EXTRACT(YEAR FROM dob::DATE) = $' + (queryParams.length + 1);
+        queryParams.push(birthYear);
+    }
+
+    if (relation_type_id !== undefined) {
+        query += ' AND relation_type = $' + (queryParams.length + 1);
+        queryParams.push(relation_type_id);
+    }
+
+    if (interested_in_id !== undefined) {
+        query += ' AND interested_in = $' + (queryParams.length + 1);
+        queryParams.push(interested_in_id);
+    }
+
+    if (habit_id !== undefined) {
+        query += ' AND habit = $' + (queryParams.length + 1);
+        queryParams.push(habit_id);
+    }
 
     try {
-        // Check if the user exists
-        const userQuery = 'SELECT id FROM Users WHERE id = $1';
-        const user = await pool.query(userQuery, [id]);
+        const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+        const userExistResult = await pool.query(userExistQuery, [userId]);
 
-        if (user.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'User not found.' });
+        if (userExistResult.rows.length === 0) {
+            return res.status(404).json({ error: true, msg: 'User not found' });
         }
 
-        let query = `
-        SELECT 'Gender' as table_name, id, gender as matched_field FROM Gender WHERE gender ILIKE $1
-        UNION ALL
-        SELECT 'Relationship' as table_name, id, relation_type as matched_field FROM Relationship WHERE relation_type ILIKE $1
-        UNION ALL
-        SELECT 'Cookingskill' as table_name, id, cooking_skill as matched_field FROM Cookingskill WHERE cooking_skill ILIKE $1
-        UNION ALL 
-        SELECT 'Habits' as table_name, id, habit as matched_field FROM Habits WHERE habit ILIKE $1
-        UNION ALL
-        SELECT 'Exercise' as table_name, id, exercise as matched_field FROM Exercise WHERE exercise ILIKE $1
-        UNION ALL
-        SELECT 'Hobbies' as table_name, id, hobby as matched_field FROM Hobbies WHERE hobby ILIKE $1
-        UNION ALL
-        SELECT 'Nightlife' as table_name, id, night_life as matched_field FROM Nightlife WHERE night_life ILIKE $1
-        UNION ALL
-        SELECT 'Kids' as table_name, id, kids_opinion as matched_field FROM Kids WHERE kids_opinion ILIKE $1
-        UNION ALL
-        SELECT 'Smoking' as table_name, id, smoking_opinion as matched_field FROM Smoking WHERE smoking_opinion ILIKE $1
-      `;
+        const userLatitude = userExistResult.rows[0].latitude;
+        const userLongitude = userExistResult.rows[0].longitude;
 
-        const queryParams = [`%${name}%`];
+        let fetchUsersQuery = query;
+        const countQuery = 'SELECT COUNT(*) FROM (' + fetchUsersQuery + ') AS count';
 
-        if (interested_in) {
-            // Add a check for interested_in against Gender table
-            query += `
-          UNION ALL
-          SELECT 'InterestedIn' as table_name, id, gender as matched_field FROM Gender WHERE id = $${queryParams.length + 1}
-        `;
-            queryParams.push(interested_in);
-        } if (relation_type) {
-            query += `
-          UNION ALL
-          SELECT 'RelationType' as table_name, id, relation_type as matched_field FROM Relationship WHERE id = $${queryParams.length + 1}
-        `;
-            queryParams.push(relation_type);
-        } if (cooking_skill) {
-            query += `
-          UNION ALL
-          SELECT 'Cookingskill' as table_name, id, cooking_skill as matched_field FROM Cookingskill WHERE id = $${queryParams.length + 1}
-        `;
-            queryParams.push(cooking_skill);
-        }
-        if (exercise) {
-            query += `
-          UNION ALL
-          SELECT 'Exercise' as table_name, id, exercise as matched_field FROM Exercise WHERE id = $${queryParams.length + 1}
-        `;
-            queryParams.push(exercise);
+        if (page && limit) {
+            const offset = (page - 1) * limit;
+            fetchUsersQuery += ` OFFSET ${offset} LIMIT ${limit}`;
         }
 
-        const { rows } = await pool.query(query, queryParams);
+        const fetchUsersResult = await pool.query(fetchUsersQuery, queryParams);
+        const countResult = await pool.query(countQuery, queryParams);
 
-        if (rows.length > 0) {
-            res.json({ error: false, data: rows.map(row => ({ id: row.id, value: row.matched_field })) });
-        } else {
-            res.status(404).json({ error: true, msg: 'No matching records found.' });
+        const users = fetchUsersResult.rows;
+        const count = parseInt(countResult.rows[0].count);
+
+        if (distance !== undefined) {
+            // Filter users based on the provided distance
+            const filteredUsers = users.filter(user => {
+                const userDist = calculateDistance(
+                    parseFloat(userLatitude),
+                    parseFloat(userLongitude),
+                    parseFloat(user.latitude),
+                    parseFloat(user.longitude)
+                );
+                return userDist <= distance;
+            });
+
+            return res.json({ error: false, count, users: filteredUsers });
         }
+
+        return res.json({ error: false, count, users });
     } catch (error) {
-        res.status(500).json({ error: true, msg: 'Internal server error.' });
+        console.error('Error occurred:', error);
+        return res.status(500).json({ error: true, msg: 'Something went wrong' });
     }
+
+    // try {
+    //     const { userId } = req.params;
+    //     const { gender, online_status, location, age, distance, relation_type_id, interested_in_id, habit_id } = req.body;
+
+    //     // Fetch latitude and longitude of the user specified in params
+    //     const userExistQuery = 'SELECT * FROM Users WHERE id = $1';
+    //     const userExistResult = await pool.query(userExistQuery, [userId]);
+
+    //     if (userExistResult.rows.length === 0) {
+    //         return res.status(404).json({ error: 'User not found' });
+    //     }
+
+    //     const userLatitude = userExistResult.rows[0].latitude;
+    //     const userLongitude = userExistResult.rows[0].longitude;
+
+    //     let fetchUsersQuery = `
+    //         SELECT * FROM Users
+    //         WHERE id <> $1
+    //         AND block_status = false
+    //         AND report_status = false
+    //         AND deleted_status = false
+    //     `;
+
+    //     const queryParams = [userId];
+
+    //     if (gender !== undefined) {
+    //         fetchUsersQuery += ' AND gender = $' + (queryParams.length + 1);
+    //         queryParams.push(gender);
+    //     }
+
+    // if (online_status !== undefined) {
+    //     fetchUsersQuery += ' AND online_status = $' + (queryParams.length + 1);
+    //     queryParams.push(online_status);
+    // }
+
+    // if (location !== undefined) {
+    //     fetchUsersQuery += ' AND location = $' + (queryParams.length + 1);
+    //     queryParams.push(location);
+    // }
+
+    // if (age !== undefined) {
+    //     const currentYear = new Date().getFullYear();
+    //     const birthYear = currentYear - age;
+
+    //     fetchUsersQuery += ' AND EXTRACT(YEAR FROM dob::DATE) = $' + (queryParams.length + 1);
+    //     queryParams.push(birthYear);
+    // }
+
+    // if (relation_type_id !== undefined) {
+    //     fetchUsersQuery += ' AND relation_type = $' + (queryParams.length + 1);
+    //     queryParams.push(relation_type_id);
+    // }
+
+    // if (interested_in_id !== undefined) {
+    //     fetchUsersQuery += ' AND interested_in = $' + (queryParams.length + 1);
+    //     queryParams.push(interested_in_id);
+    // }
+
+    // if (habit_id !== undefined) {
+    //     fetchUsersQuery += ' AND habit = $' + (queryParams.length + 1);
+    //     queryParams.push(habit_id);
+    // }
+
+    //     const fetchUsersResult = await pool.query(fetchUsersQuery, queryParams);
+    //     let users = fetchUsersResult.rows;
+
+    //     if (distance !== undefined) {
+    //         // Filter users based on the provided distance
+    //         users = users.filter(user => {
+    //             const userDist = calculateDistance(
+    //                 parseFloat(userLatitude),
+    //                 parseFloat(userLongitude),
+    //                 parseFloat(user.latitude),
+    //                 parseFloat(user.longitude)
+    //             );
+    //             return userDist <= distance;
+    //         });
+    //     }
+
+    //     res.json({ users });
+    // } catch (error) {
+    //     console.error('Error occurred:', error);
+    //     res.status(500).json({ error: 'Something went wrong' });
+    // }
 
 };
 
@@ -911,16 +1035,23 @@ const getVerifiedUsers = async (req, res) => {
     const offset = (page - 1) * limit;
 
     try {
-        // Check if the provided userId exists in the Users table
-        const userCheckQuery = `SELECT id FROM Users WHERE id = $1`;
-        const userCheckResult = await pool.query(userCheckQuery, [userId]);
+        // Fetch latitude and longitude of the user from the database
+        const userLocationQuery = `
+            SELECT latitude, longitude FROM Users WHERE id = $1
+        `;
+        const userLocationResult = await pool.query(userLocationQuery, [userId]);
 
-        if (userCheckResult.rows.length === 0) {
+        if (userLocationResult.rows.length === 0) {
             return res.status(404).json({ msg: 'User not found', error: true });
         }
 
-        let query = ` 
-            SELECT *, COUNT(*) OVER() AS total_count
+        const userLatitude = userLocationResult.rows[0].latitude;
+        const userLongitude = userLocationResult.rows[0].longitude;
+
+        const query = `
+            SELECT *,
+            (6371 * acos(cos(radians($2)) * cos(radians(latitude)) * cos(radians(longitude) - radians($3)) + sin(radians($4)) * sin(radians(latitude)))) AS distance,
+            EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
             FROM Users
             WHERE verified_status = true
             AND id <> $1 -- Exclude specific user
@@ -928,11 +1059,11 @@ const getVerifiedUsers = async (req, res) => {
             AND report_status = false
             AND deleted_status = false 
             ORDER BY id
-            OFFSET $2
-            LIMIT $3
+            OFFSET $5
+            LIMIT $6
         `;
 
-        const result = await pool.query(query, [userId, offset, limit]);
+        const result = await pool.query(query, [userId, userLatitude, userLongitude, userLatitude, offset, limit]);
 
         const users = result.rows;
         const totalCount = users.length > 0 ? users[0].total_count : 0;
@@ -948,7 +1079,7 @@ const getVerifiedUsers = async (req, res) => {
         console.error('Error fetching users:', error);
         return res.status(500).json({ msg: 'Internal server error', error: true });
     }
-};
+}
 
 const checkUserExists = async (userId) => {
     const client = await pool.connect();
@@ -1128,8 +1259,31 @@ const getrecentprofiles = async (req, res) => {
             return res.status(404).json({ msg: 'User not found', error: true });
         }
 
-        const query = 'SELECT * FROM Users WHERE created_at >= $1 AND id != $2 AND block_status != true OFFSET $3 LIMIT $4';
-        const queryParams = [twentyFourHoursAgo, userId, offset, limit];
+        const userLocationQuery = 'SELECT latitude, longitude FROM Users WHERE id = $1';
+        const userLocationResult = await pool.query(userLocationQuery, [userId]);
+
+        const userLat = userLocationResult.rows[0].latitude;
+        const userLong = userLocationResult.rows[0].longitude;
+
+        const query = `
+            SELECT 
+                u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+                u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.dob, u.gender, u.verified_status, u.report_status,
+                u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+                DATE_PART('year', AGE(current_date, to_date(u.dob, 'YYYY-MM-DD'))) AS age,
+                (6371 * acos(
+                    cos(radians($1)) * cos(radians(u.latitude)) * cos(radians(u.longitude) - radians($2)) + 
+                    sin(radians($1)) * sin(radians(u.latitude))
+                )) AS distance
+            FROM Users u
+            WHERE u.created_at >= $3 
+                AND u.id != $4 
+                AND u.block_status != true 
+                AND u.deleted_status != true
+                AND u.report_status != true
+            OFFSET $5 LIMIT $6`;
+
+        const queryParams = [userLat, userLong, twentyFourHoursAgo, userId, offset, limit];
 
         const usersLast24Hours = await pool.query(query, queryParams);
 
@@ -1137,13 +1291,13 @@ const getrecentprofiles = async (req, res) => {
         const totalCount = users.length;
 
         return res.status(200).json({
-            msg: 'Users signed up in the last 24 hours fetched successfully',
+            msg: 'Users signed up in the last 24 hours fetched successfully with distance and age',
             error: false,
             count: totalCount,
             data: users,
         });
     } catch (error) {
-        console.error('Error fetching users signed up in the last 24 hours:', error);
+        console.error('Error fetching users signed up in the last 24 hours with distance and age:', error);
         return res.status(500).json({ msg: 'Internal server error', error: true });
     }
 }
@@ -1154,53 +1308,58 @@ const getCurrentlyOnlineUsers = async (req, res) => {
 
     const offset = (page - 1) * limit;
 
-    try {
-        // Check if the provided userId exists in the Users table
-        const userCheckQuery = `SELECT id FROM Users WHERE id = '${userId}'`;
-        const userCheckResult = await pool.query(userCheckQuery);
+    const userQuery = `SELECT latitude, longitude FROM Users WHERE id = '${userId}'`;
 
-        if (userCheckResult.rows.length === 0) {
+    try {
+        const userResult = await pool.query(userQuery);
+
+        if (userResult.rows.length === 0) {
             return res.status(404).json({ msg: 'User not found', error: true });
         }
-        let query = `
-        SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
-            u.deleted_status, u.block_status, u.height, u.location, u.gender, u.verified_status, u.report_status,
-            u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
-            g.gender AS interested_in_data,
-            r.relation_type AS relation_type_data,
-            c.cooking_skill AS cooking_skill_data,
-            h.habit AS habit_data,
-            e.exercise AS exercise_data,
-            hb.hobby AS hobby_data,
-            s.smoking_opinion AS smoking_opinion_data,
-            k.kids_opinion AS kids_opinion_data,
-            n.night_life AS night_life_data
-        FROM Users u
-        LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
-        LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
-        LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
-        LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
-        LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
-        LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
-        LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
-        LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
-        LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-        WHERE u.deleted_status = false  
-            AND u.block_status = false 
-            AND u.report_status = false
-            AND u.online_status = true
-            AND u.id != '${userId}'
-    `;
 
-        if (userId) {
-            query += ` AND u.id != '${userId}'`;
-        }
+        const { latitude: userLat, longitude: userLong } = userResult.rows[0];
+
+        let query = `
+            SELECT 
+                u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
+                u.deleted_status, u.block_status, u.height, u.location, u.latitude, u.longitude, u.dob, u.gender, u.verified_status, u.report_status,
+                u.online_status, u.subscription_status, u.created_at, u.updated_at, u.deleted_at,
+                g.gender AS interested_in_data,
+                r.relation_type AS relation_type_data,
+                c.cooking_skill AS cooking_skill_data,
+                h.habit AS habit_data,
+                e.exercise AS exercise_data,
+                hb.hobby AS hobby_data,
+                s.smoking_opinion AS smoking_opinion_data,
+                k.kids_opinion AS kids_opinion_data,
+                n.night_life AS night_life_data,
+                DATE_PART('year', AGE(current_date, to_date(u.dob, 'YYYY-MM-DD'))) AS age,
+                (6371 * acos(
+                    cos(radians(${userLat})) * cos(radians(u.latitude)) * cos(radians(u.longitude) - radians(${userLong})) + 
+                    sin(radians(${userLat})) * sin(radians(u.latitude))
+                )) AS distance
+            FROM Users u
+            LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
+            LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
+            LEFT JOIN Cookingskill c ON u.cooking_skill::varchar = c.id::varchar
+            LEFT JOIN Habits h ON u.habit::varchar = h.id::varchar
+            LEFT JOIN Exercise e ON u.exercise::varchar = e.id::varchar
+            LEFT JOIN Hobbies hb ON u.hobby::varchar = hb.id::varchar
+            LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
+            LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
+            LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+            WHERE u.deleted_status = false  
+                AND u.block_status = false 
+                AND u.report_status = false
+                AND u.online_status = true
+                AND u.id != '${userId}'
+        `;
 
         if (page && limit) {
             query += `
-        OFFSET ${offset}
-        LIMIT ${limit}
-    `;
+                OFFSET ${offset}
+                LIMIT ${limit}
+            `;
         }
 
         const result = await pool.query(query);

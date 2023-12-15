@@ -130,68 +130,91 @@ const getSmokingopinionByID = async (req, res) => {
 };
 
 const getusersofsmokingopinion = async (req, res) => {
-    const { smoking_id } = req.body;
+    const { smoking_id, user_id } = req.body;
     const { page, limit } = req.query;
-
+  
     if (!smoking_id) {
-        return res.status(400).json({ error: true, msg: 'Smoking ID is missing in the request body' });
+      return res.status(400).json({ error: true, msg: 'Smoking ID is missing in the request body' });
     }
-
+  
     try {
-        // Check if the ID exists in the Users table
-        const userExistQuery = 'SELECT COUNT(*) FROM Users WHERE smoking_opinion = $1 AND deleted_status = false AND block_status = false AND report_status = false';
-        const userExistResult = await pool.query(userExistQuery, [smoking_id]);
-        const totalCount = parseInt(userExistResult.rows[0].count);
-
-        if (totalCount === 0) {
-            return res.status(404).json({ error: true, msg: 'No users found for this smoking opinion' });
+      // Check if the ID exists in the Users table
+      const userExistQuery = 'SELECT COUNT(*) FROM Users WHERE smoking_opinion = $1 AND deleted_status = false AND block_status = false AND report_status = false';
+      const userExistResult = await pool.query(userExistQuery, [smoking_id]);
+      const totalCount = parseInt(userExistResult.rows[0].count);
+  
+      if (totalCount === 0) {
+        return res.status(404).json({ error: true, msg: 'No users found for this smoking opinion' });
+      }
+  
+      let usersData;
+      let query;
+      const params = [smoking_id];
+  
+      if (user_id) {
+        // Check if the provided user ID exists in the Users table
+        const userCheckQuery = 'SELECT * FROM Users WHERE id = $1 LIMIT 1';
+        const userCheckResult = await pool.query(userCheckQuery, [user_id]);
+  
+        if (userCheckResult.rows.length === 0) {
+          return res.status(404).json({ error: true, msg: 'User ID does not exist in the database' });
         }
-
-        let usersData;
-        // Fetch users associated with the smoking_id with pagination and additional conditions
-        if (page && limit) {
-            const offset = (page - 1) * limit;
-            const usersQuery = `
-                SELECT * FROM Users 
-                WHERE smoking_opinion = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false 
-                LIMIT $2 OFFSET $3
-            `;
-            const usersResult = await pool.query(usersQuery, [smoking_id, limit, offset]);
-            usersData = usersResult.rows;
-        } else {
-            const allUsersQuery = `
-                SELECT * FROM Users 
-                WHERE smoking_opinion = $1 
-                AND deleted_status = false 
-                AND block_status = false 
-                AND report_status = false
-            `;
-            const allUsersResult = await pool.query(allUsersQuery, [smoking_id]);
-            usersData = allUsersResult.rows;
-        }
-
-        // Fetch smoking opinion details for the provided smoking_id
-        const smokingQuery = 'SELECT * FROM Smoking WHERE id = $1';
-        const smokingResult = await pool.query(smokingQuery, [smoking_id]);
-        const smokingData = smokingResult.rows;
-
-        const response = {
-            error: false,
-            count: totalCount,
-            users: usersData,
-            smoking_opinion_details: smokingData,
-        };
-
-        res.status(200).json(response);
+  
+        query = `
+          SELECT *,
+          ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
+          * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
+          * sin( radians( latitude ) ) ) ) AS distance,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE smoking_opinion = $1
+          AND id != $5 -- Exclude the provided user ID
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+  
+        params.push(user_id, user_id, user_id, user_id);
+      } else {
+        query = `
+          SELECT *,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE smoking_opinion = $1
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+      }
+  
+      if (page && limit) {
+        const offset = (page - 1) * limit;
+        query += ` LIMIT $${params.length + 1} OFFSET $${params.length + 2}`;
+        params.push(limit, offset);
+      }
+  
+      const usersResult = await pool.query(query, params);
+      usersData = usersResult.rows;
+  
+      // Fetch smoking opinion details for the provided smoking_id
+      const smokingQuery = 'SELECT * FROM Smoking WHERE id = $1';
+      const smokingResult = await pool.query(smokingQuery, [smoking_id]);
+      const smokingData = smokingResult.rows;
+  
+      const response = {
+        error: false,
+        count: usersData.length,
+        users: usersData,
+        smoking_opinion_details: smokingData,
+      };
+  
+      res.status(200).json(response);
     } catch (error) {
-        console.error('Error:', error.message);
-        res.status(500).json({ error: true, msg: 'Internal server error' });
+      console.error('Error:', error.message);
+      res.status(500).json({ error: true, msg: 'Internal server error' });
     }
-};
-
+  };
+  
 const filterSmokingOpinion = async (req, res) => {
     const { user_id } = req.params;
     const { smoking_opinion_id } = req.body;

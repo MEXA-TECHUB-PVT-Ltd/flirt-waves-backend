@@ -14,7 +14,7 @@ router.delete('/delete_user/:id', userController.deleteuser);
 router.get('/getall_deleted_users', userController.getalldeletedusers);
 router.delete('/deleteuser_permanently/:userId', userController.deleteuserpermanently);
 router.put('/updateuser_status/:id', userController.updateUserBlockStatus);
-router.post('/get_preferences_with_filters/:id', userController.getUsersWithFilters);
+router.post('/get_preferences_with_filters/:userId', userController.getUsersWithFilters);
 router.put('/updateuser_verificationstatus/:id', userController.updateUserVerifiedStatus);  
 router.post('/updateuser_subscriptionstatus/:id', userController.updateUserSubscriptionStatus);  
 router.get('/get_subscribed_users', userController.getAllUsersWithSubscription);    

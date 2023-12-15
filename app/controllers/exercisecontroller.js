@@ -23,24 +23,24 @@ const updateexercise = async (req, res) => {
     try {
         const { id } = req.params; // Get the ID from the URL parameters
         const { exercise, image } = req.body; // Extract 'exercise' and 'image' from request body
-    
+
         const updatedexercise = await pool.query(
-          'UPDATE Exercise SET exercise = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
-          [exercise, image, id] // Include 'exercise', 'image', and 'id' in the query parameters
+            'UPDATE Exercise SET exercise = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+            [exercise, image, id] // Include 'exercise', 'image', and 'id' in the query parameters
         );
-    
+
         if (updatedexercise.rows.length === 0) {
-          return res.status(404).json({ error: true, msg: 'Exercise not found' });
+            return res.status(404).json({ error: true, msg: 'Exercise not found' });
         }
-    
+
         res.json({
-          msg: 'Exercise updated successfully',
-          error: false,
-          data: updatedexercise.rows[0],
+            msg: 'Exercise updated successfully',
+            error: false,
+            data: updatedexercise.rows[0],
         });
-      } catch (error) {
+    } catch (error) {
         res.status(500).json({ error: true, msg: error.message });
-      }
+    }
 };
 
 const deleteexercise = async (req, res) => {
@@ -102,7 +102,7 @@ const getAllexercises = async (req, res) => {
 };
 
 const getusersofexercise = async (req, res) => {
-    const { exercise_id } = req.body;
+    const { exercise_id, user_id } = req.body;
 
     if (!exercise_id) {
         return res.status(400).json({ error: true, msg: 'Exercise ID is missing in the request body' });
@@ -117,19 +117,57 @@ const getusersofexercise = async (req, res) => {
             return res.status(404).json({ error: true, msg: 'ID does not exist' });
         }
 
-        // Fetch users associated with the exercise_id
-        const usersQuery = 'SELECT * FROM Users WHERE exercise = $1';
-        const usersResult = await pool.query(usersQuery, [exercise_id]);
+        let usersData;
+        let query;
+        const params = [exercise_id];
+
+        if (user_id) {
+            // Check if the provided user ID exists in the Users table
+            const userCheckQuery = 'SELECT * FROM Users WHERE id = $1 LIMIT 1';
+            const userCheckResult = await pool.query(userCheckQuery, [user_id]);
+
+            if (userCheckResult.rows.length === 0) {
+                return res.status(404).json({ error: true, msg: 'User ID does not exist in the database' });
+            }
+
+            query = `
+          SELECT *,
+          ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
+          * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
+          * sin( radians( latitude ) ) ) ) AS distance,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE exercise = $1
+          AND id != $5 -- Exclude the provided user ID
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+
+            params.push(user_id, user_id, user_id, user_id);
+        } else {
+            query = `
+          SELECT *,
+          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+          FROM Users
+          WHERE exercise = $1
+          AND report_status = false
+          AND block_status = false
+          AND deleted_status = false
+        `;
+        }
+
+        const usersResult = await pool.query(query, params);
+        usersData = usersResult.rows;
 
         // Fetch exercise details for the provided exercise_id
         const exerciseQuery = 'SELECT * FROM Exercise WHERE id = $1';
         const exerciseResult = await pool.query(exerciseQuery, [exercise_id]);
-
-        const usersData = usersResult.rows;
         const exerciseData = exerciseResult.rows;
 
         const response = {
             error: false,
+            count: usersData.length,
             users: usersData,
             exercise_details: exerciseData,
         };
