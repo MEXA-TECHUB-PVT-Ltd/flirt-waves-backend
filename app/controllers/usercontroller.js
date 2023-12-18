@@ -71,7 +71,7 @@ const usersignup = async (req, res) => {
         const mailOptions = {
             from: 'mahreentassawar@gmail.com',
             to: email,
-            subject: 'Registration Successfull', 
+            subject: 'Registration Successfull',
             html: `
             <html>
             <head>
@@ -101,15 +101,16 @@ const usersignup = async (req, res) => {
                         margin-top:-40vh;
                         display: inline-block;
                         margin: 0 5px; /* Adjust spacing between icons */
-                        max-width: 50px; /* Adjust size as needed */
+                        max-width: 60px; /* Adjust size as needed */
                     }
-                    .flirt-waves {
+                    .flirt-waves { 
+                        font-weight:bold;
                         font-size: 20px;
                         color: black;
-                        margin: 0; /* Remove default margins */
+                        margin-top: 15px; /* Remove default margins */
                     }
                     .container {
-                        max-width: 700px;
+                        max-width: 600px;
                         margin: 0 auto;
                         padding: 20px;
                         background-color: #fff;
@@ -137,26 +138,26 @@ const usersignup = async (req, res) => {
                     /* Add more styles as needed */
                 </style>
             </head>
-            <body>
-
-                <div class="container">
-
+            <body> 
+            <div style="display: flex; justify-content: start; align-content: start;"> 
                 <img class="logo" src="${logo}" alt="Logo"> 
-
+                <p class="flirt-waves">Flirt Waves</p> 
+                </div>
+                <div class="container"> 
+                
                     <!-- Second Image -->
-                    <img src="${imagePath}" alt="Embedded Image" style="width: 100%;margin-top:20px; height:100px">
-                    <!-- Rest of your email content -->
-                    <p style="color: black; text-align: left; font-weight:600px; margin: 15px 0;">Hey,</p>
+                    <img src="${welcome}" alt="Embedded Image" style="width: 40%; "><br/><br/>
+                    <img src="${where_connection_begin}" alt="Embedded Image" style="width: 50%; "> 
+                    <!-- Rest of your email content --> 
                     <p style="color: #606060; text-align: left; margin: 15px 0;">
-                    Welcome to GT-Signals – the ultimate platform for seamless and intelligent trading. We're thrilled to have you on board, and we can't wait for you to experience the power of smart investing right at your fingertips.</p>
+                    Welcome, to the place where meaningful connections spark! We're thrilled to have you join our vibrant community of individuals seeking love, friendship, and genuine connections.</p>
 
                     <p style="color: #606060; text-align: left; margin: 15px 0;">
-                    To get started, simply log in to your account using the credentials you provided during registration. If you have any questions or need assistance, feel free to reach out to our support team at  <span style="color: #E3B12F;" >GT-Signal@email.com</span>
+                    Our advanced matching algorithm is designed to connect you with like-minded individuals based on your preferences and interests.
                     </p>
 
                     <p style="color: #606060; text-align: left; margin: 15px 0;">
-                    Thank you for choosing GT-Signals. We're excited to be part of your trading journey, and we look forward to helping you achieve your financial goals.
-                    Happy trading!
+                    Stay tuned for exciting events and features tailored to enhance your dating experience. We're here to make every connection memorable.
                     </p>
 
                     <div class="header"> 
@@ -175,10 +176,12 @@ const usersignup = async (req, res) => {
 
                     <!-- Add a copyright symbol -->
                     <p style="color: black; text-align: center; font-weight:boldest; font-size:13px;">
-                        &#169; 2023 GT-Signal. All right reserved
+                        &#169; 2023 Flirt Waves. All right reserved
                     </p>
                 </div>
-
+                <p style="color: #606060; text-align: left; margin: 15px 0;">
+                If you have any questions, feel free message us at  <span style={{fontWeight:"bold",fontSize:"20px"}}>Flirtwaves@gmail.com.</span> All right reserved. Update email preferences or unsubscribe.
+                 </p>
                 </div>
             </body>
             </html>
@@ -560,6 +563,8 @@ const updateuserprofile = async (req, res) => {
     }
 };
 
+const welcome = 'https://res.cloudinary.com/dxfdrtxi3/image/upload/v1702877141/welcome_zaaupm.png';
+const where_connection_begin = 'https://res.cloudinary.com/dxfdrtxi3/image/upload/v1702877277/Where_connections_begins_oksafk.png';
 const imagePath = 'https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701837514/email_template_nlwqow.png';
 const logo = "https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701863140/logo_iw9fap.png";
 const twitter = "https://res.cloudinary.com/dxfdrtxi3/image/upload/v1701865005/twitter_fnifjv.png"

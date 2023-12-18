@@ -1,8 +1,8 @@
 const pool = require("../config/dbconfig")
 
 const reportuser = async (req, res) => {
-  const { user_id } = req.params; // Extract user_id from the request parameters
-  const { reporter_id, reason, description } = req.body; // Extract reporter_id, reason, and description from the request body
+  const { user_id } = req.params;
+  const { reporter_id, reason, description } = req.body;
 
   try {
     // Check if the user exists and fetch user details
@@ -21,13 +21,21 @@ const reportuser = async (req, res) => {
       return res.status(404).json({ error: true, msg: 'Reporter not found' });
     }
 
+    // Check if the user has already been reported by the same reporter
+    const alreadyReportedQuery = 'SELECT * FROM ReportUsers WHERE user_id = $1 AND reporter_id = $2';
+    const alreadyReportedResult = await pool.query(alreadyReportedQuery, [user_id, reporter_id]);
+
+    if (alreadyReportedResult.rows.length > 0) {
+      return res.status(400).json({ error: true, msg: 'You have already reported this user' });
+    }
+
     // Insert report into ReportUsers table
     const reportUserQuery = 'INSERT INTO ReportUsers (user_id, reason, description, reporter_id) VALUES ($1, $2, $3, $4) RETURNING *';
     const reportUserResult = await pool.query(reportUserQuery, [user_id, reason, description, reporter_id]);
 
     // Update report_status to true for the reported user
     const updateReportStatusQuery = 'UPDATE Users SET report_status = true WHERE id = $1';
-    await pool.query(updateReportStatusQuery, [reporter_id]);
+    await pool.query(updateReportStatusQuery, [user_id]);
 
     // Get details of the reported user
     const reportedUserQuery = 'SELECT * FROM Users WHERE id = $1';
