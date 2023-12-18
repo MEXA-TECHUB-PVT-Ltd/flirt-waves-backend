@@ -298,10 +298,10 @@ const getAllFeedbacks = async (req, res) => {
         // Group feedbacks by user ID
         const userFeedbacks = {};
         feedbackData.forEach((feedback) => {
-            const { id, name,email ,images,gender,dob/* other user details */ } = feedback;
+            const { id, name, email, images, gender, dob, height, interested_in, relation_type, exercise, hobby, habit, kids_opinion, smoking_opinion, night_life/* other user details */ } = feedback;
             if (!userFeedbacks[id]) {
                 userFeedbacks[id] = {
-                    userDetails: { id, name ,email,images,gender,dob/* other user details */ },
+                    userDetails: { id, name, email, images, gender, dob, height, interested_in, relation_type, exercise, hobby, habit, kids_opinion, smoking_opinion, night_life/* other user details */ },
                     userFeedbacks: [feedback], // Initialize with the first feedback
                 };
             } else {
