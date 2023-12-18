@@ -76,7 +76,7 @@ app.use("/matches", require("./app/routes/matches/matchesroutes"));
 app.use("/favourites", require("./app/routes/favourite/favouriteroutes"));
 app.use("/crush", require("./app/routes/crush/crushroutes"));
 app.use("/faqs", require("./app/routes/faq/faqroutes"));
-app.use("/feedback", require("./app/routes/feedback/feedbackroutes"));
+app.use("/feedback", require("./app/routes/feedback/Feedbackroutes"));
 app.use("/payment", require("./app/routes/stripe/striperoutes"));
 app.use("/calls", require("./app/routes/calling/callroutes"));
 
