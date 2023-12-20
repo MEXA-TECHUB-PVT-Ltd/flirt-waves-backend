@@ -35,7 +35,7 @@ const reportuser = async (req, res) => {
 
     // Update report_status to true for the reported user
     const updateReportStatusQuery = 'UPDATE Users SET report_status = true WHERE id = $1';
-    await pool.query(updateReportStatusQuery, [user_id]);
+    await pool.query(updateReportStatusQuery, [req.body.user_id]);
 
     // Get details of the reported user
     const reportedUserQuery = 'SELECT * FROM Users WHERE id = $1';

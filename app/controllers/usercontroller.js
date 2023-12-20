@@ -1308,6 +1308,12 @@ const getDashboardprofiles = async (req, res) => {
             const userLongitude = userResult.rows[0].longitude;
 
             if (userDOB && userLatitude !== null && userLongitude !== null) {
+                // Calculate age from the user's date of birth
+                const dobDate = new Date(userDOB);
+                const ageDiffMs = Date.now() - dobDate.getTime();
+                const ageDate = new Date(ageDiffMs); // Epoch
+                const calculatedAge = Math.abs(ageDate.getUTCFullYear() - 1970);
+                
                 // Calculate age difference (+5 years or -5 years) from the user's date of birth
                 const queryDatePlus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() + 5));
                 const queryDateMinus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() - 5));
@@ -1336,7 +1342,7 @@ const getDashboardprofiles = async (req, res) => {
                     msg: "users fetched",
                     error: false,
                     count: data.length,
-                    data,
+                    data: data.map(user => ({ ...user, age: calculatedAge })), // Include age in each user data
                 });
             } else {
                 res.status(404).json({ error: true, msg: 'User date of birth or coordinates are missing' });
