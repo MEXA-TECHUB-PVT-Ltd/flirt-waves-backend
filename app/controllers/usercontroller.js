@@ -1079,20 +1079,32 @@ const getUsersWithFilters = async (req, res) => {
         const fetchUsersResult = await pool.query(fetchUsersQuery, queryParams);
         const countResult = await pool.query(countQuery, queryParams);
 
-        const users = fetchUsersResult.rows.map(user => {
-            const userAge = calculateAge(user.dob); // Implement calculateAge function accordingly
-            const userDistance = calculateDistance(
-                parseFloat(userLatitude),
-                parseFloat(userLongitude),
-                parseFloat(user.latitude),
-                parseFloat(user.longitude)
-            );
+        const fetchSavedStatusQuery = `
+        SELECT favorite_user_id
+        FROM Favorites
+        WHERE user_id = $1
+    `;
+    const savedStatusResult = await pool.query(fetchSavedStatusQuery, [userId]);
 
-            return {
-                ...user,
-                age: userAge,
-                distance: userDistance
-            };
+    const savedUsers = savedStatusResult.rows.map(row => row.favorite_user_id);
+
+    const users = fetchUsersResult.rows.map(user => {
+        const userAge = calculateAge(user.dob); // Implement calculateAge function accordingly
+        const userDistance = calculateDistance(
+            parseFloat(userLatitude),
+            parseFloat(userLongitude),
+            parseFloat(user.latitude),
+            parseFloat(user.longitude)
+        );
+
+        const savedStatus = savedUsers.includes(user.id); // Check if user is saved as a favorite
+
+        return {
+            ...user,
+            age: userAge,
+            distance: userDistance,
+            savedStatus // Include savedStatus in the user object
+        };
         });
 
         const count = parseInt(countResult.rows[0].count);
@@ -1155,21 +1167,29 @@ const getVerifiedUsers = async (req, res) => {
         const userLongitude = userLocationResult.rows[0].longitude;
 
         const query = `
-            SELECT *,
-            (6371 * acos(cos(radians($2)) * cos(radians(latitude)) * cos(radians(longitude) - radians($3)) + sin(radians($4)) * sin(radians(latitude)))) AS distance,
-            EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
-            FROM Users
-            WHERE verified_status = true
-            AND id <> $1 -- Exclude specific user
-            AND block_status = false
-            AND report_status = false
-            AND deleted_status = false 
-            ORDER BY id
-            OFFSET $5
-            LIMIT $6
+            SELECT u.*, 
+                CASE 
+                    WHEN f.favorite_user_id IS NULL THEN false 
+                    ELSE true 
+                END AS savedStatus,
+                ( 6371 * acos(
+                    cos(radians($2)) * cos(radians(u.latitude)) * cos(radians(u.longitude) - radians($3)) +
+                    sin(radians($2)) * sin(radians(u.latitude))
+                )) AS distance,
+                EXTRACT(YEAR FROM AGE(TO_DATE(u.dob, 'YYYY-MM-DD'))) AS age
+            FROM Users u
+            LEFT JOIN Favorites f ON u.id = f.favorite_user_id AND f.user_id = $1
+            WHERE u.verified_status = true
+            AND u.deleted_status = false
+            AND u.report_status = false
+            And u.block_status = false
+            AND u.id <> $1 -- Exclude specific user
+            ORDER BY u.id
+            OFFSET $4
+            LIMIT $5
         `;
-
-        const result = await pool.query(query, [userId, userLatitude, userLongitude, userLatitude, offset, limit]);
+    
+        const result = await pool.query(query, [userId, userLatitude, userLongitude, offset, limit]);
 
         const users = result.rows;
         const totalCount = users.length > 0 ? users[0].total_count : 0;
@@ -1313,7 +1333,7 @@ const getDashboardprofiles = async (req, res) => {
                 const ageDiffMs = Date.now() - dobDate.getTime();
                 const ageDate = new Date(ageDiffMs); // Epoch
                 const calculatedAge = Math.abs(ageDate.getUTCFullYear() - 1970);
-                
+
                 // Calculate age difference (+5 years or -5 years) from the user's date of birth
                 const queryDatePlus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() + 5));
                 const queryDateMinus5Years = new Date(new Date(userDOB).setFullYear(new Date(userDOB).getFullYear() - 5));
@@ -1336,7 +1356,23 @@ const getDashboardprofiles = async (req, res) => {
                     similarUsersQuery += ` OFFSET ${offset} LIMIT ${limit}`;
                 }
 
-                const { rows: data } = await pool.query(similarUsersQuery, [userId, interested_in, userLatitude, userLongitude, queryDateMinus5Years, queryDatePlus5Years]);
+                const { rows: data } = await pool.query(
+                    `
+                    SELECT u.*, 
+                        ( 6371 * acos( cos( radians($3) ) * cos( radians( latitude ) ) * cos( radians( longitude ) - radians($4) ) + sin( radians($3) ) * sin( radians( latitude ) ) ) ) AS distance,
+                        CASE WHEN f.id IS NOT NULL THEN true ELSE false END AS savedStatus
+                    FROM users u
+                    LEFT JOIN Favorites f ON u.id = f.favorite_user_id AND f.user_id = $1
+                    WHERE u.id != $1
+                    AND u.interested_in = $2
+                    AND u.dob BETWEEN $5 AND $6 
+                    AND u.deleted_status = false
+                    AND u.block_status = false
+                    AND u.report_status = false
+                    ${page && limit ? `OFFSET ${(page - 1) * limit} LIMIT ${limit}` : ''}
+                    `,
+                    [userId, interested_in, userLatitude, userLongitude, queryDateMinus5Years, queryDatePlus5Years]
+                );
 
                 res.status(200).json({
                     msg: "users fetched",
@@ -1357,13 +1393,12 @@ const getDashboardprofiles = async (req, res) => {
 
 const getrecentprofiles = async (req, res) => {
     const { page = 1, limit = 10 } = req.query;
-    const { userId } = req.params; // Assuming the user ID is provided in the params
+    const { userId } = req.params;
     const offset = (page - 1) * limit;
 
     try {
-        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000); // Get the time 24 hours ago
+        const twentyFourHoursAgo = new Date(Date.now() - 24 * 60 * 60 * 1000);
 
-        // Check if the provided userId exists in the Users table
         const userCheckQuery = 'SELECT id FROM Users WHERE id = $1';
         const userCheckResult = await pool.query(userCheckQuery, [userId]);
 
@@ -1386,16 +1421,22 @@ const getrecentprofiles = async (req, res) => {
                 (6371 * acos(
                     cos(radians($1)) * cos(radians(u.latitude)) * cos(radians(u.longitude) - radians($2)) + 
                     sin(radians($1)) * sin(radians(u.latitude))
-                )) AS distance
+                )) AS distance,
+                CASE 
+                    WHEN f.favorite_user_id IS NULL THEN false 
+                    ELSE true 
+                END AS savedStatus
             FROM Users u
-            WHERE u.created_at >= $3 
-                AND u.id != $4 
+            LEFT JOIN Favorites f ON u.id = f.favorite_user_id AND f.user_id = $3
+            WHERE u.created_at >= $4 
+                AND u.id != $5 
                 AND u.block_status != true 
                 AND u.deleted_status != true
                 AND u.report_status != true
-            OFFSET $5 LIMIT $6`;
+            ORDER BY u.id
+            OFFSET $6 LIMIT $7`;
 
-        const queryParams = [userLat, userLong, twentyFourHoursAgo, userId, offset, limit];
+        const queryParams = [userLat, userLong, userId, twentyFourHoursAgo, userId, offset, limit];
 
         const usersLast24Hours = await pool.query(query, queryParams);
 
@@ -1449,7 +1490,8 @@ const getCurrentlyOnlineUsers = async (req, res) => {
                 (6371 * acos(
                     cos(radians(${userLat})) * cos(radians(u.latitude)) * cos(radians(u.longitude) - radians(${userLong})) + 
                     sin(radians(${userLat})) * sin(radians(u.latitude))
-                )) AS distance
+                )) AS distance,
+                CASE WHEN f.favorite_user_id IS NOT NULL THEN true ELSE false END AS savedStatus
             FROM Users u
             LEFT JOIN Gender g ON u.interested_in::varchar = g.id::varchar
             LEFT JOIN Relationship r ON u.relation_type::varchar = r.id::varchar
@@ -1460,6 +1502,7 @@ const getCurrentlyOnlineUsers = async (req, res) => {
             LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
             LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
             LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
+            LEFT JOIN Favorites f ON u.id = f.favorite_user_id AND f.user_id = '${userId}'
             WHERE u.deleted_status = false  
                 AND u.block_status = false 
                 AND u.report_status = false
