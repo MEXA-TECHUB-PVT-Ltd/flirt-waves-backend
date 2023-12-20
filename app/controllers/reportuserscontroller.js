@@ -33,18 +33,17 @@ const reportuser = async (req, res) => {
     const reportUserQuery = 'INSERT INTO ReportUsers (user_id, reason, description, reporter_id) VALUES ($1, $2, $3, $4) RETURNING *';
     const reportUserResult = await pool.query(reportUserQuery, [user_id, reason, description, reporter_id]);
 
-    console.log("req.body.user_id",req.body.user_id,reporter_id)
+    console.log("req.body.user_id", req.body.user_id, reporter_id)
     // Update report_status to true for the reported user
-    const updateReportStatusQuery = 'UPDATE Users SET report_status = true WHERE id = $1';
-    await pool.query(updateReportStatusQuery, [reporter_id]);
-
+    const updateReportStatusQuery = 'UPDATE Users SET report_status = true WHERE id IN ($1, $2)';
+    await pool.query(updateReportStatusQuery, [user_id, reporter_id]);
     // Get details of the reported user
     const reportedUserQuery = 'SELECT * FROM Users WHERE id = $1';
     const reportedUserResult = await pool.query(reportedUserQuery, [user_id]);
     const reportedUserDetails = reportedUserResult.rows[0];
 
     // Get details of the reporting user
-    const reportingUserQuery = 'SELECT * FROM Users WHERE id = $1';
+  const reportingUserQuery = 'SELECT * FROM Users WHERE id = $1';
     const reportingUserResult = await pool.query(reportingUserQuery, [reporter_id]);
     const reportingUserDetails = reportingUserResult.rows[0];
 
