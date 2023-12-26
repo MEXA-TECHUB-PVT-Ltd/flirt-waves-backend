@@ -161,32 +161,37 @@ const getusersofhobby = async (req, res) => {
             }
 
             query = `
-          SELECT *,
-          ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
-          * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
-          * sin( radians( latitude ) ) ) ) AS distance,
-          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
-          FROM Users
-          WHERE hobby = $1
-          AND id != $5 -- Exclude the provided user ID
-          AND report_status = false
-          AND block_status = false
-          AND deleted_status = false
-          AND id != ${user_id}
-        `;
+                SELECT *,
+                ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
+                * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
+                * sin( radians( latitude ) ) ) ) AS distance,
+                EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age,
+                EXISTS (
+                    SELECT 1 FROM Favorites 
+                    WHERE (user_id = $5 AND favorite_user_id = Users.id) 
+                       OR (user_id = Users.id AND favorite_user_id = $5)
+                ) AS saved_status
+                FROM Users
+                WHERE hobby = $1
+                AND id != $6 -- Exclude the provided user ID
+                AND report_status = false
+                AND block_status = false
+                AND deleted_status = false
+                AND id != ${user_id}
+            `;
 
-            params.push(user_id, user_id, user_id, user_id);
+            params.push(user_id, user_id, user_id, user_id, user_id);
         } else {
             query = `
-          SELECT *,
-          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
-          FROM Users
-          WHERE hobby = $1
-          AND report_status = false
-          AND block_status = false
-          AND deleted_status = false
-          AND id != ${user_id}
-        `;
+                SELECT *,
+                EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+                FROM Users
+                WHERE hobby = $1
+                AND report_status = false
+                AND block_status = false
+                AND deleted_status = false
+                AND id != ${user_id}
+            `;
         }
 
         if (page && limit) {

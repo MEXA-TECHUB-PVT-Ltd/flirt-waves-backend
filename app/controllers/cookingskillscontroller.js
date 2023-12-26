@@ -1,172 +1,169 @@
 const pool = require("../config/dbconfig")
 
 const addCookingskill = async (req, res) => {
-    try {
-        const { cooking_skill, image } = req.body; // Extract 'cooking_skill' and 'image' from request body
-    
-        const newCookingskill = await pool.query(
-          'INSERT INTO Cookingskill (cooking_skill, image) VALUES ($1, $2) RETURNING *',
-          [cooking_skill, image] // Include both 'cooking_skill' and 'image' in the query parameters
-        );
-    
-        res.json({
-          msg: 'Cooking skill added successfully',
-          error: false,
-          data: newCookingskill.rows[0],
-        });
-      } catch (error) {
-        res.status(500).json({ error: true, msg: error.message });
-      }
+  try {
+    const { cooking_skill, image } = req.body; // Extract 'cooking_skill' and 'image' from request body
+
+    const newCookingskill = await pool.query(
+      'INSERT INTO Cookingskill (cooking_skill, image) VALUES ($1, $2) RETURNING *',
+      [cooking_skill, image] // Include both 'cooking_skill' and 'image' in the query parameters
+    );
+
+    res.json({
+      msg: 'Cooking skill added successfully',
+      error: false,
+      data: newCookingskill.rows[0],
+    });
+  } catch (error) {
+    res.status(500).json({ error: true, msg: error.message });
+  }
 };
 
 const updatecookingskill = async (req, res) => {
-    try {
-        const { id } = req.params; // Get the ID from the URL parameters
-        const { cooking_skill, image } = req.body; // Extract 'cooking_skill' and 'image' from request body
-    
-        const updatedcookingskill = await pool.query(
-          'UPDATE Cookingskill SET cooking_skill = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
-          [cooking_skill, image, id] // Include 'cooking_skill', 'image', and 'id' in the query parameters
-        );
-    
-        if (updatedcookingskill.rows.length === 0) {
-          return res.status(404).json({ error: true, msg: 'Cooking skill not found' });
-        }
-    
-        res.json({
-          msg: 'Cooking skill updated successfully',
-          error: false,
-          data: updatedcookingskill.rows[0],
-        });
-      } catch (error) {
-        res.status(500).json({ error: true, msg: error.message });
-      }
+  try {
+    const { id } = req.params; // Get the ID from the URL parameters
+    const { cooking_skill, image } = req.body; // Extract 'cooking_skill' and 'image' from request body
+
+    const updatedcookingskill = await pool.query(
+      'UPDATE Cookingskill SET cooking_skill = $1, image = $2, updated_at = NOW() WHERE id = $3 RETURNING *',
+      [cooking_skill, image, id] // Include 'cooking_skill', 'image', and 'id' in the query parameters
+    );
+
+    if (updatedcookingskill.rows.length === 0) {
+      return res.status(404).json({ error: true, msg: 'Cooking skill not found' });
+    }
+
+    res.json({
+      msg: 'Cooking skill updated successfully',
+      error: false,
+      data: updatedcookingskill.rows[0],
+    });
+  } catch (error) {
+    res.status(500).json({ error: true, msg: error.message });
+  }
 };
 
 const deleteCookingskill = async (req, res) => {
-    try {
-        const { id } = req.params; // Get the ID from the URL parameters
+  try {
+    const { id } = req.params; // Get the ID from the URL parameters
 
-        const deletedCookingskill = await pool.query(
-            'DELETE FROM Cookingskill WHERE id = $1 RETURNING *',
-            [id]
-        );
+    const deletedCookingskill = await pool.query(
+      'DELETE FROM Cookingskill WHERE id = $1 RETURNING *',
+      [id]
+    );
 
-        if (deletedCookingskill.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'Cokking skill not found' });
-        }
-
-        res.json({
-            msg: 'Deleted successfully',
-            error: false,
-            data: deletedCookingskill.rows[0],
-        });
-    } catch (error) {
-        res.status(500).json({ error: true, msg: error.message });
+    if (deletedCookingskill.rows.length === 0) {
+      return res.status(404).json({ error: true, msg: 'Cokking skill not found' });
     }
+
+    res.json({
+      msg: 'Deleted successfully',
+      error: false,
+      data: deletedCookingskill.rows[0],
+    });
+  } catch (error) {
+    res.status(500).json({ error: true, msg: error.message });
+  }
 };
 
 const getAllcookingskill = async (req, res) => {
-    const { page = 1, limit = 10 } = req.query;
+  const { page = 1, limit = 10 } = req.query;
 
-    // Calculate the OFFSET based on the page and limit
-    const offset = (page - 1) * limit;
+  // Calculate the OFFSET based on the page and limit
+  const offset = (page - 1) * limit;
 
-    try {
-        let query = `
+  try {
+    let query = `
         SELECT *
         FROM Cookingskill
       `;
 
-        // Check if pagination parameters are provided
-        if (page && limit) {
-            query += `
+    // Check if pagination parameters are provided
+    if (page && limit) {
+      query += `
           OFFSET ${offset}
           LIMIT ${limit}
         `;
-        }
-
-        const result = await pool.query(query);
-
-        const cookingskill = result.rows;
-        return res.status(200).json({
-            msg: 'Fetched successfully',
-            error: false,
-            count: cookingskill.length,
-            data: cookingskill,
-        });
-    } catch (error) {
-        console.error('Error fetching cooking skill:', error);
-        return res.status(500).json({ msg: 'Internal server error', error: true });
     }
+
+    const result = await pool.query(query);
+
+    const cookingskill = result.rows;
+    return res.status(200).json({
+      msg: 'Fetched successfully',
+      error: false,
+      count: cookingskill.length,
+      data: cookingskill,
+    });
+  } catch (error) {
+    console.error('Error fetching cooking skill:', error);
+    return res.status(500).json({ msg: 'Internal server error', error: true });
+  }
 };
 
 const getusersofcookingskill = async (req, res) => {
-    const { cooking_skill_id, user_id } = req.body;
-    const { page, limit } = req.query;
-  
-    if (!cooking_skill_id) {
-      return res.status(400).json({ error: true, msg: 'Cooking skill ID is missing in the request body' });
-    }
-  
-    // Check if the provided user ID exists in the Users table
-    const userCheckQuery = 'SELECT * FROM Users WHERE id = $1 LIMIT 1';
-    const userCheckResult = await pool.query(userCheckQuery, [user_id]);
-  
-    if (user_id && userCheckResult.rows.length === 0) {
-      return res.status(404).json({ error: true, msg: 'User ID does not exist in the database' });
-    }
-  
-    let query = `
-    SELECT *,
-    ( 6371 * acos( cos( radians($1) ) * cos( radians( latitude ) )
-    * cos( radians( longitude ) - radians($2) ) + sin( radians($3) )
-    * sin( radians( latitude ) ) ) ) AS distance,
-    EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
-    FROM Users
-    WHERE cooking_skill = $4
-    AND deleted_status = false
-    AND block_status = false
-    AND report_status = false
-    AND id != ${user_id}
+  const { cooking_skill_id, user_id } = req.body;
+  const { page, limit } = req.query;
+
+  if (!cooking_skill_id) {
+    return res.status(400).json({ error: true, msg: 'Cooking skill ID is missing in the request body' });
+  }
+
+  let query = `
+      SELECT *,
+      ( 6371 * acos( cos( radians($1) ) * cos( radians( latitude ) )
+      * cos( radians( longitude ) - radians($2) ) + sin( radians($3) )
+      * sin( radians( latitude ) ) ) ) AS distance,
+      EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age,
+      EXISTS (
+          SELECT 1 FROM Favorites 
+          WHERE (user_id = $4 AND favorite_user_id = Users.id) 
+             OR (user_id = Users.id AND favorite_user_id = $4)
+      ) AS saved_status
+      FROM Users
+      WHERE cooking_skill = $5
+      AND deleted_status = false
+      AND block_status = false
+      AND report_status = false
+      AND id != $6
   `;
-  
-  const params = [user_id, user_id, user_id, cooking_skill_id];
-  
-    if (page && limit) {
-      const offset = (page - 1) * limit;
-      query += ` OFFSET $5 LIMIT $6`;
-      params.push(offset, limit);
-    }
-  
-    try {
-      const usersResult = await pool.query(query, params);
-      const userData = usersResult.rows;
-  
-      const countQuery = 'SELECT COUNT(*) FROM Users WHERE cooking_skill = $1 AND deleted_status = false AND block_status = false AND report_status = false';
-      const countResult = await pool.query(countQuery, [cooking_skill_id]);
-      const totalCount = countResult.rows[0].count;
-  
-      const response = {
-        error: false,
-        count: userData.length,
-        users: userData,
-      };
-  
-      res.status(200).json(response);
-    } catch (error) {
-      console.error('Error:', error.message);
-      res.status(500).json({ error: true, msg: 'Internal server error' });
-    }
-  };  
+
+  const params = [user_id, user_id, user_id, user_id, cooking_skill_id, user_id];
+
+  if (page && limit) {
+    const offset = (page - 1) * limit;
+    query += ` OFFSET $7 LIMIT $8`;
+    params.push(offset, limit);
+  }
+
+  try {
+    const usersResult = await pool.query(query, params);
+    const userData = usersResult.rows;
+
+    const countQuery = 'SELECT COUNT(*) FROM Users WHERE cooking_skill = $1 AND deleted_status = false AND block_status = false AND report_status = false';
+    const countResult = await pool.query(countQuery, [cooking_skill_id]);
+    const totalCount = countResult.rows[0].count;
+
+    const response = {
+      error: false,
+      count: userData.length,
+      users: userData,
+    };
+
+    res.status(200).json(response);
+  } catch (error) {
+    console.error('Error:', error.message);
+    res.status(500).json({ error: true, msg: 'Internal server error' });
+  }
+};
 
 const filtercookingskill = async (req, res) => {
-    const { user_id } = req.params;
-    const { cooking_skill_id } = req.body;
+  const { user_id } = req.params;
+  const { cooking_skill_id } = req.body;
 
-    try {
-        // Check if the user exists
-        const userQuery = `
+  try {
+    // Check if the user exists
+    const userQuery = `
         SELECT u.id, u.name, u.email, u.password, u.token, u.signup_type, u.images, u.device_id,
         u.deleted_status, u.block_status, u.height, u.location,u.latitude, u.longitude,u.gender, u.verified_status, u.report_status,
         u.online_status,u.subscription_status,u.created_at, u.updated_at, u.deleted_at,
@@ -192,34 +189,34 @@ const filtercookingskill = async (req, res) => {
     WHERE u.id = $1 AND u.deleted_status = false
         `;
 
-        const userResult = await pool.query(userQuery, [user_id]);
+    const userResult = await pool.query(userQuery, [user_id]);
 
-        if (userResult.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'User not found' });
-        }
-
-        // Check if the cooking skill exists
-        const cookingSkillQuery = 'SELECT * FROM Cookingskill WHERE id = $1';
-        const cookingSkillResult = await pool.query(cookingSkillQuery, [cooking_skill_id]);
-
-        if (cookingSkillResult.rows.length === 0) {
-            return res.status(404).json({ error: true, msg: 'Cooking skill not found' });
-        }
-
-        // Both user and cooking skill exist, return details
-        const userData = userResult.rows[0];
-        const cookingSkillData = cookingSkillResult.rows[0];
-
-        res.status(200).json({
-            error: false,
-            msg: 'User and Cooking skill details fetched successfully',
-            user: userData,
-            cooking_skill: cookingSkillData,
-        });
-    } catch (error) {
-        res.status(500).json({ error: true, msg: error.message });
+    if (userResult.rows.length === 0) {
+      return res.status(404).json({ error: true, msg: 'User not found' });
     }
-    
+
+    // Check if the cooking skill exists
+    const cookingSkillQuery = 'SELECT * FROM Cookingskill WHERE id = $1';
+    const cookingSkillResult = await pool.query(cookingSkillQuery, [cooking_skill_id]);
+
+    if (cookingSkillResult.rows.length === 0) {
+      return res.status(404).json({ error: true, msg: 'Cooking skill not found' });
+    }
+
+    // Both user and cooking skill exist, return details
+    const userData = userResult.rows[0];
+    const cookingSkillData = cookingSkillResult.rows[0];
+
+    res.status(200).json({
+      error: false,
+      msg: 'User and Cooking skill details fetched successfully',
+      user: userData,
+      cooking_skill: cookingSkillData,
+    });
+  } catch (error) {
+    res.status(500).json({ error: true, msg: error.message });
+  }
+
 };
 
-module.exports = { filtercookingskill,addCookingskill, updatecookingskill, deleteCookingskill, getAllcookingskill, getusersofcookingskill };
+module.exports = { filtercookingskill, addCookingskill, updatecookingskill, deleteCookingskill, getAllcookingskill, getusersofcookingskill };
