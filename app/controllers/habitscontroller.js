@@ -102,6 +102,7 @@ const getAllHabits = async (req, res) => {
 };
 
 const getusersofhabit = async (req, res) => {
+
     const { habit_id, user_id } = req.body;
     const { page, limit } = req.query;
 
@@ -112,11 +113,11 @@ const getusersofhabit = async (req, res) => {
     try {
         // Check if there are users associated with the habit_id
         const usersExistQuery = `
-        SELECT COUNT(*)
-        FROM Users WHERE habit = $1 
-        AND deleted_status = false 
-        AND block_status = false 
-        AND report_status = false  
+            SELECT COUNT(*)
+            FROM Users WHERE habit = $1 
+            AND deleted_status = false 
+            AND block_status = false 
+            AND report_status = false  
         `;
         const usersExistResult = await pool.query(usersExistQuery, [habit_id]);
         const totalCount = parseInt(usersExistResult.rows[0].count);
@@ -149,32 +150,37 @@ const getusersofhabit = async (req, res) => {
             }
 
             query = `
-          SELECT *,
-          ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
-          * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
-          * sin( radians( latitude ) ) ) ) AS distance,
-          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
-          FROM Users
-          WHERE habit = $1
-          AND id != $5 -- Exclude the provided user ID
-          AND deleted_status = false
-          AND block_status = false
-          AND report_status = false
-          AND id != ${user_id}
-        `;
+                SELECT *,
+                ( 6371 * acos( cos( radians($2) ) * cos( radians( latitude ) )
+                * cos( radians( longitude ) - radians($3) ) + sin( radians($4) )
+                * sin( radians( latitude ) ) ) ) AS distance,
+                EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age,
+                EXISTS (
+                    SELECT 1 FROM Favorites 
+                    WHERE (user_id = $5 AND favorite_user_id = Users.id) 
+                       OR (user_id = Users.id AND favorite_user_id = $5)
+                ) AS saved_status
+                FROM Users
+                WHERE habit = $1
+                AND id != $6 -- Exclude the provided user ID
+                AND deleted_status = false
+                AND block_status = false
+                AND report_status = false
+                AND id != ${user_id}
+            `;
 
-            params.push(user_id, user_id, user_id, user_id);
+            params.push(user_id, user_id, user_id, user_id, user_id);
         } else {
             query = `
-          SELECT *,
-          EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
-          FROM Users
-          WHERE habit = $1
-          AND deleted_status = false
-          AND block_status = false
-          AND report_status = false
-          AND id != ${user_id}
-        `;
+                SELECT *,
+                EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
+                FROM Users
+                WHERE habit = $1
+                AND deleted_status = false
+                AND block_status = false
+                AND report_status = false
+                AND id != ${user_id}
+            `;
         }
 
         if (page && limit) {

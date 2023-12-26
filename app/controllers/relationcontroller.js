@@ -168,25 +168,29 @@ const getusersofrelationtype = async (req, res) => {
   }
 
   let query = `
-    SELECT *,
-    ( 6371 * acos( cos( radians($1) ) * cos( radians( latitude ) )
-    * cos( radians( longitude ) - radians($2) ) + sin( radians($3) )
-    * sin( radians( latitude ) ) ) ) AS distance,
-    EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age
-    FROM Users
-    WHERE relation_type = $4
-    AND id != $5 -- Exclude the provided user ID
-    AND report_status = false
-    AND deleted_status = false
-    AND block_status = false
-    AND id != ${user_id}
+  SELECT *,
+  ( 6371 * acos( cos( radians($1) ) * cos( radians( latitude ) )
+  * cos( radians( longitude ) - radians($2) ) + sin( radians($3) )
+  * sin( radians( latitude ) ) ) ) AS distance,
+  EXTRACT(YEAR FROM AGE(TO_DATE(dob, 'YYYY-MM-DD'))) AS age,
+  EXISTS (
+      SELECT 1 FROM Favorites 
+      WHERE (user_id = $4 AND favorite_user_id = Users.id) 
+         OR (user_id = Users.id AND favorite_user_id = $4)
+  ) AS saved_status
+  FROM Users
+  WHERE relation_type = $5
+  AND id != $6 -- Exclude the provided user ID
+  AND report_status = false
+  AND deleted_status = false
+  AND block_status = false
   `;
 
-  const params = [user_id, user_id, user_id, relation_type_id, user_id];
+  const params = [user_id, user_id, user_id, user_id, relation_type_id, user_id];
 
   if (page && limit) {
     const offset = (page - 1) * limit;
-    query += ` OFFSET $6 LIMIT $7`;
+    query += ` OFFSET $7 LIMIT $8`;
     params.push(offset, limit);
   }
 

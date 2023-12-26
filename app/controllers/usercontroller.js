@@ -260,66 +260,7 @@ const usersignin = async (req, res) => {
     } catch (error) {
         console.error(error);
         res.status(500).json({ error: true, msg: 'Internal server error' });
-    }
-
-
-    // const { email, password, device_id } = req.body;
-
-    // // Validate email format
-    // if (!isValidEmail(email)) {
-    //     return res.status(400).json({ error: true, msg: 'Invalid email format' });
-    // }
-
-    // try {
-    //     // Check if the user with the provided email exists
-    //     const user = await pool.query('SELECT * FROM Users WHERE email = $1', [email]);
-
-    //     if (user.rows.length === 0) {
-    //         return res.status(401).json({ error: true, msg: 'User not found' });
-    //     }
-
-    //     const userData = user.rows[0]; // User data retrieved from the database
-
-    //     if (userData.signup_type === 'email') {
-    //         // User signed up using email, require password for login
-    //         if (!password || typeof password !== 'string') {
-    //             return res.status(400).json({ error: true, msg: 'Password is required for email login' });
-    //         }
-
-    //         const hashedPassword = userData.password;
-
-    //         // Check if the provided password matches the hashed password in the database
-    //         const isPasswordValid = await bcrypt.compare(password, hashedPassword);
-
-    //         if (!isPasswordValid) {
-    //             return res.status(401).json({ error: true, msg: 'Invalid password' });
-    //         }
-    //     } else if (userData.signup_type === 'google' || userData.signup_type === 'apple') {
-    //         // User signed up using Google or Apple, validate token for login
-    //         const tokenFromDB = userData.token; // Token stored in the database during signup
-
-    //         if (!tokenFromDB || typeof tokenFromDB !== 'string') {
-    //             return res.status(401).json({ error: true, msg: 'Token not found' });
-    //         }
-    //     }
-
-    //     // Update device_id if provided during sign-in
-    //     if (device_id && typeof device_id === 'string') {
-    //         await pool.query('UPDATE Users SET device_id = $1, last_active = CURRENT_TIMESTAMP, online_status = true WHERE email = $2', [device_id, email]);
-    //     } else {
-    //         await pool.query('UPDATE Users SET last_active = CURRENT_TIMESTAMP, online_status = true WHERE email = $1', [email]);
-    //     }
-
-    //     // Fetch updated user data after the device_id update
-    //     const updatedUser = await pool.query('SELECT * FROM Users WHERE email = $1', [email]);
-    //     const updatedUserData = updatedUser.rows[0];
-
-    //     res.status(200).json({ error: false, msg: 'Login successful', data: updatedUserData });
-
-    // } catch (error) {
-    //     console.error(error);
-    //     res.status(500).json({ error: true, msg: 'Internal server error' });
-    // }
+    } 
 
 };
 
@@ -349,7 +290,9 @@ const getallusers = async (req, res) => {
         LEFT JOIN Smoking s ON u.smoking_opinion::varchar = s.id::varchar
         LEFT JOIN Kids k ON u.kids_opinion::varchar = k.id::varchar
         LEFT JOIN Nightlife n ON u.night_life::varchar = n.id::varchar
-        WHERE u.deleted_status = false  
+        WHERE 
+        u.deleted_status = false  
+        AND u.report_status = false
         ORDER BY u.created_at DESC
     `;
 
@@ -1597,7 +1540,10 @@ const searchUserByName = async (req, res) => {
         }
 
         // Perform a search query based on the provided name using ILIKE for pattern matching
-        const users = await pool.query('SELECT * FROM Users WHERE name ILIKE $1 AND block_status = false', [`%${name}%`]);
+        const users = await pool.query(
+            'SELECT *, EXTRACT(YEAR FROM AGE(NOW(), TO_DATE(dob, \'YYYY-MM-DD\'))) AS age FROM Users WHERE name ILIKE $1 AND block_status = false AND report_status = false AND deleted_status = false',
+            [`%${name}%`]
+        );
 
         if (users.rows.length === 0) {
             return res.status(404).json({ error: true, msg: 'No users found with that name' });
