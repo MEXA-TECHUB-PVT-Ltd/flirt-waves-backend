@@ -237,13 +237,22 @@ const getCallsByCallerId = async (req, res) => {
     // Fetch caller details only when there are calls
     const userDetails = await getUserDetailsById(callerId); // Fetch caller details using the provided function
 
-    // Fetch calls made by the specified caller_id with pagination
+    // Fetch all calls made by the specified caller_id with pagination and caller/receiver details
     const offset = (page - 1) * limit;
     const getCallsQuery = `
-        SELECT * FROM calls WHERE caller_id = $1 ORDER BY created_at DESC LIMIT $2 OFFSET $3;
+        SELECT calls.*, 
+               caller_details.*, 
+               receiver_details.*
+        FROM calls
+        JOIN users AS caller_details ON calls.caller_id = caller_details.id
+        JOIN users AS receiver_details ON calls.receiver_id = receiver_details.id
+        WHERE calls.caller_id = $1 
+        ORDER BY calls.created_at DESC 
+        OFFSET $2
+        LIMIT $3;
       `;
 
-    const callsResult = await pool.query(getCallsQuery, [callerId, limit, offset]);
+    const callsResult = await pool.query(getCallsQuery, [callerId, offset, limit]);
     const calls = callsResult.rows;
 
     res.status(200).json({
